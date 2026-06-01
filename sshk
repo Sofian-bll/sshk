@@ -1,0 +1,510 @@
+#!/usr/bin/env bash
+# sshk — SSH Key Manager
+# Gère les identités (keys/) et les accès (authorized_keys.d/)
+# Usage: sshk <create|list|show|copy|delete|grant|revoke|help>
+
+set -euo pipefail
+
+readonly KEYS_DIR="$HOME/.ssh/keys"
+readonly AUTH_DIR="$HOME/.ssh/authorized_keys.d"
+readonly CONFIG_DIR="$HOME/.ssh/config.d"
+readonly SCRIPT="sshk"
+
+# ── Palette (Vesper) ──────────────────────────────────────────
+readonly C_RESET="\033[0m"
+readonly C_BOLD="\033[1m"
+readonly C_DIM="\033[2m"
+readonly C_GREEN="\033[38;5;114m"
+readonly C_BLUE="\033[38;5;145m"
+readonly C_YELLOW="\033[38;5;216m"
+readonly C_RED="\033[38;5;210m"
+readonly C_WHITE="\033[38;5;255m"
+
+ok()   { echo -e "  ${C_GREEN}✅${C_RESET} $*"; }
+info() { echo -e "  ${C_BLUE}ℹ${C_RESET}  $*"; }
+warn() { echo -e "  ${C_YELLOW}⚠️${C_RESET}  $*"; }
+err()  { echo -e "  ${C_RED}❌${C_RESET} $*" >&2; }
+bold() { echo -e "${C_BOLD}$*${C_RESET}"; }
+div()  { printf "  ${C_DIM}%${1:-40}s${C_RESET}\n" | tr ' ' '─'; }
+
+clipboard_copy() {
+    local text="$1"
+    command -v pbcopy  &>/dev/null && { printf '%s' "$text" | pbcopy; return 0; }
+    command -v wl-copy &>/dev/null && { printf '%s' "$text" | wl-copy; return 0; }
+    command -v xclip   &>/dev/null && { printf '%s' "$text" | xclip -sel clipboard; return 0; }
+    [[ -n "${TMUX:-}" ]]          && { printf '%s' "$text" | tmux load-buffer -; return 0; }
+    return 1
+}
+
+# ── Key / Auth helpers ────────────────────────────────────────
+key_dir()  { echo "$KEYS_DIR/$1"; }
+key_file() {
+    local d; d="$(key_dir "$1")"
+    [[ -f "$d/id_ed25519" ]] && { echo "$d/id_ed25519"; return 0; }
+    [[ -f "$d/id_rsa"     ]] && { echo "$d/id_rsa";     return 0; }
+    return 1
+}
+key_exists() { key_file "$1" &>/dev/null; }
+
+key_type() {
+    key_file "$1" | grep -q "ed25519" && { echo "ed25519"; return 0; }
+    key_file "$1" | grep -q "rsa"     && { echo "rsa";     return 0; }
+    echo "?"
+}
+key_fp()   { ssh-keygen -lf "$(key_file "$1")" 2>/dev/null | awk '{print $2}'; }
+key_comment() { ssh-keygen -lf "$(key_file "$1")" 2>/dev/null | awk '{for(i=4;i<=NF;i++)printf "%s%s",$i,(i<NF?OFS:"")}'; }
+key_date() {
+    local ts f; f="$(key_file "$1")"
+    ts=$(stat -f "%Sm" -t "%Y-%m-%d" "$f" 2>/dev/null) ||
+    ts=$(date -d "@$(stat -c '%Y' "$f" 2>/dev/null)" "+%Y-%m-%d" 2>/dev/null) ||
+    ts="?"
+    echo "$ts"
+}
+key_hostname() { grep -h "HostName" "$CONFIG_DIR"/*"$1".conf 2>/dev/null | awk '{print $2}' | head -1; }
+config_for()   { grep -lE "Host[[:space:]]+${1}([[:space:]]|\$)" "$CONFIG_DIR"/*.conf 2>/dev/null || true; }
+
+auth_exists() { [[ -f "$AUTH_DIR/$1" ]]; }
+auth_fp()     { ssh-keygen -lf "$AUTH_DIR/$1" 2>/dev/null | awk '{print $2}'; }
+auth_date() {
+    local f="$AUTH_DIR/$1"
+    ts=$(stat -f "%Sm" -t "%Y-%m-%d" "$f" 2>/dev/null) ||
+    ts=$(date -d "@$(stat -c '%Y' "$f" 2>/dev/null)" "+%Y-%m-%d" 2>/dev/null) ||
+    ts="?"
+    echo "$ts"
+}
+auth_comment() { ssh-keygen -lf "$AUTH_DIR/$1" 2>/dev/null | awk '{for(i=4;i<=NF;i++)printf "%s%s",$i,(i<NF?OFS:"")}'; }
+
+# ── Grant helper ──────────────────────────────────────────────
+grant_key() {
+    local name="$1"
+    key_exists "$name" || { err "Identité '$name' introuvable. Créez-la avec 'sshk create $name'."; return 1; }
+    local hostname; hostname=$(key_hostname "$name") || true
+    [[ -z "$hostname" ]] && { err "Pas de HostName configuré pour '$name'. Re-créez la clé avec un HostName."; return 1; }
+    local pub; pub="$(key_file "$name").pub"
+
+    info "Copie de la clé publique vers $name ($hostname)..."
+    if ! ssh-copy-id -i "$pub" "$name" 2>/dev/null; then
+        err "Échec de ssh-copy-id. Vérifiez que $name est joignable et que le mot de passe est accepté."
+        return 1
+    fi
+
+    # Le fichier est nommé d'après le hostname LOCAL (ex: nova, macbook)
+    local me; me=$(hostname -s)
+
+    ssh "$name" "
+        mkdir -p ~/.ssh/authorized_keys.d
+        chmod 700 ~/.ssh/authorized_keys.d
+        tail -1 ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.d/$me
+        sed -i '\$d' ~/.ssh/authorized_keys 2>/dev/null || true
+        chmod 600 ~/.ssh/authorized_keys.d/$me
+        echo OK
+    " 2>/dev/null
+
+    if [[ $? -eq 0 ]]; then
+        ok "Accès accordé → ${C_BOLD}$me${C_RESET} autorisé sur ${C_BOLD}$name${C_RESET}."
+    else
+        warn "Clé copiée mais le renommage automatique a échoué."
+        info "À faire manuellement sur $name :"
+        echo -e "    tail -1 ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.d/$me"
+        echo -e "    sed -i '\$d' ~/.ssh/authorized_keys"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════
+# COMMANDS
+# ═══════════════════════════════════════════════════════════════
+
+cmd_create() {
+    case "${1:-}" in --help|-h) cmd_create_help; return ;; esac
+
+    echo ""
+    bold "  🔑  Créer une nouvelle clé SSH"
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    read -p "  › Nom      : " NAME
+    [[ -z "$NAME" ]] && { err "Nom requis."; exit 1; }
+    if key_exists "$NAME"; then
+        warn "Une clé existe déjà pour '$NAME'."
+        read -p "  Écraser ? [y/N] " OV
+        [[ "$OV" != "y" ]] && { info "Annulé."; exit 0; }
+        rm -rf "$(key_dir "$NAME")"
+    fi
+
+    echo ""
+    read -p "  › Type     [1=ed25519, 2=rsa] : " TC
+    case "$TC" in 2) TYPE="rsa"; BITS="-b 4096"; TL="rsa" ;; *) TYPE="ed25519"; BITS=""; TL="ed25519" ;; esac
+
+    read -p "  › Comment  [sofian@$NAME] : " COMMENT; COMMENT=${COMMENT:-sofian@$NAME}
+    read -p "  › HostName (laisser vide si sshk ne contacte pas cette machine) : " HN
+
+    echo ""
+    div 48
+    echo -e "  Nom        : ${C_GREEN}$NAME${C_RESET}"
+    echo -e "  Type       : ${C_BLUE}$TL${C_RESET}"
+    echo -e "  Fichier    : ~/.ssh/keys/${C_BLUE}$NAME${C_RESET}/id_$TL"
+    echo -e "  Comment    : $COMMENT"
+    [[ -n "$HN" ]] && echo -e "  HostName   : $HN"
+    div 48
+    echo ""
+    read -p "  Créer ? [Y/n] " CF; [[ "$CF" == "n" ]] && { info "Annulé."; exit 0; }
+
+    echo ""
+    mkdir -p "$(key_dir "$NAME")" && chmod 700 "$(key_dir "$NAME")"
+    # shellcheck disable=SC2086
+    ssh-keygen -t "$TYPE" $BITS -C "$COMMENT" -f "$(key_dir "$NAME")/id_$TL" -N "" &>/dev/null &&
+        ok "Clé créée." || { err "Échec de la génération."; exit 1; }
+    chmod 600 "$(key_dir "$NAME")/id_$TL"
+
+    if [[ -n "$HN" ]]; then
+        local n=10
+        for f in "$CONFIG_DIR"/*.conf; do
+            [[ -f "$f" ]] || continue
+            local num; num=$(basename "$f" | cut -d- -f1)
+            [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge "$n" ]] && n=$(( (num/10 + 1) * 10 ))
+        done
+        cat > "$CONFIG_DIR/${n}-${NAME}.conf" << EOF
+Host $NAME
+    HostName $HN
+    User sofian
+    IdentityFile ~/.ssh/keys/$NAME/id_$TL
+    IdentitiesOnly yes
+EOF
+        chmod 600 "$CONFIG_DIR/${n}-${NAME}.conf"
+        ok "Fichier créé : ~/.ssh/config.d/${n}-${NAME}.conf"
+    fi
+
+    echo ""
+    div 56
+    cat "$(key_dir "$NAME")/id_${TL}.pub" | sed 's/^/  /'
+    div 56
+    echo ""
+    [[ -n "$HN" ]] && {
+        echo -e "  ${C_BOLD}ssh-copy-id${C_RESET} : ${C_BLUE}ssh-copy-id -i ~/.ssh/keys/$NAME/id_${TL}.pub $NAME${C_RESET}"
+        echo -e "  ${C_BOLD}Grant${C_RESET}       : ${C_BLUE}sshk grant $NAME${C_RESET}"
+        echo -e "  ${C_BOLD}Test${C_RESET}        : ${C_BLUE}ssh $NAME${C_RESET}"
+    }
+    [[ "$NAME" == "github" ]] && {
+        echo -e "  ${C_BOLD}GitHub${C_RESET}     : ${C_BLUE}sshk copy github${C_RESET} → https://github.com/settings/keys"
+    }
+    echo ""
+}
+
+cmd_create_help() {
+    echo ""; bold "  sshk create — Créer une nouvelle identité SSH"; echo ""
+    echo "  Usage: sshk create"
+    echo ""
+    echo "  Étapes interactives :"
+    echo "    ①  Nom          ex: github, vela, void"
+    echo "    ②  Type         ed25519 (recommandé) ou rsa 4096"
+    echo "    ③  Commentaire  apparaît dans les logs (ex: sofian@vela)"
+    echo "    ④  HostName     IP ou hostname (optionnel — pour ssh <nom>)"
+    echo ""
+    echo "  Résultat :"
+    echo "    ~/.ssh/keys/<nom>/id_ed25519       paire de clés"
+    echo "    ~/.ssh/config.d/<NN>-<nom>.conf    config SSH (si HostName fourni)"
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_list() {
+    case "${1:-}" in
+        --help|-h)  cmd_list_help; return ;;
+        -a|--auth)  list_auth; return ;;
+        -k|--keys)  list_keys; return ;;
+    esac
+
+    echo ""; bold "  🔑  Clés SSH"; echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo ""
+
+    local has_keys=false has_auth=false
+    [[ -d "$KEYS_DIR" ]] && [[ -n "$(ls -d "$KEYS_DIR"/*/ 2>/dev/null)" ]] && has_keys=true
+    [[ -d "$AUTH_DIR" ]] && [[ -n "$(ls -A "$AUTH_DIR" 2>/dev/null)" ]] && has_auth=true
+
+    if ! $has_keys && ! $has_auth; then
+        info "Aucune clé ni accès. Créez-en un avec ${C_BOLD}sshk create${C_RESET}."
+        echo ""; return
+    fi
+
+    printf "  ${C_BOLD}%-12s %-7s %-22s %-10s${C_RESET}\n" "NOM" "TYPE" "EMPREINTE" "CRÉÉ"
+    div 56
+
+    $has_keys && for d in "$KEYS_DIR"/*/; do
+        [[ -d "$d" ]] || continue
+        local n t f dt; n=$(basename "$d"); t=$(key_type "$n"); f=$(key_fp "$n"); dt=$(key_date "$n")
+        printf "  ${C_GREEN}%-12s${C_RESET} ${C_BLUE}%-7s${C_RESET} ${C_YELLOW}%-22s${C_RESET} %-10s\n" "$n" "$t" "$f" "$dt"
+    done
+
+    $has_auth && for f in "$AUTH_DIR"/*; do
+        [[ -f "$f" ]] || continue
+        local n fp dt; n=$(basename "$f"); fp=$(auth_fp "$n"); dt=$(auth_date "$n")
+        printf "  ${C_GREEN}%-12s${C_RESET} ${C_GREEN}🔓 accès${C_RESET} ${C_YELLOW}%-22s${C_RESET} %-10s\n" "$n" "$fp" "$dt"
+    done
+
+    echo ""
+    local kc=0 ac=0
+    $has_keys && kc=$(ls -d "$KEYS_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')
+    $has_auth && ac=$(ls "$AUTH_DIR"/* 2>/dev/null | wc -l | tr -d ' ')
+    info "${kc} clé(s), ${ac} accès."
+    echo ""
+}
+
+list_keys() {
+    echo ""; bold "  🔑  Mes identités"; echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo ""
+    if [[ ! -d "$KEYS_DIR" ]] || [[ -z "$(ls -d "$KEYS_DIR"/*/ 2>/dev/null)" ]]; then
+        info "Aucune identité. ${C_BOLD}sshk create${C_RESET} pour en créer une."; echo ""; return
+    fi
+    printf "  ${C_BOLD}%-12s %-9s %-22s %-10s${C_RESET}\n" "NOM" "TYPE" "EMPREINTE" "CRÉÉ"
+    div 56
+    for d in "$KEYS_DIR"/*/; do
+        [[ -d "$d" ]] || continue
+        local n t f dt; n=$(basename "$d"); t=$(key_type "$n"); f=$(key_fp "$n"); dt=$(key_date "$n")
+        printf "  ${C_GREEN}%-12s${C_RESET} ${C_BLUE}%-9s${C_RESET} ${C_YELLOW}%-22s${C_RESET} %-10s\n" "$n" "$t" "$f" "$dt"
+    done
+    local c; c=$(ls -d "$KEYS_DIR"/*/ 2>/dev/null | wc -l | tr -d ' ')
+    echo ""; info "${c} identité(s)."; echo ""
+}
+
+list_auth() {
+    echo ""; bold "  🔓  Accès autorisés sur $(hostname -s)"; echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo ""
+    if [[ ! -d "$AUTH_DIR" ]] || [[ -z "$(ls -A "$AUTH_DIR" 2>/dev/null)" ]]; then
+        info "Aucun accès autorisé. ${C_BOLD}sshk grant <nom>${C_RESET} pour en ajouter."; echo ""; return
+    fi
+    printf "  ${C_BOLD}%-12s %-22s %-10s${C_RESET}\n" "NOM" "EMPREINTE" "AJOUTÉ"
+    div 48
+    for f in "$AUTH_DIR"/*; do
+        [[ -f "$f" ]] || continue
+        local n fp dt; n=$(basename "$f"); fp=$(auth_fp "$n"); dt=$(auth_date "$n")
+        printf "  ${C_GREEN}%-12s${C_RESET} ${C_YELLOW}%-22s${C_RESET} %-10s\n" "$n" "$fp" "$dt"
+    done
+    local c; c=$(ls "$AUTH_DIR"/* 2>/dev/null | wc -l | tr -d ' ')
+    echo ""; info "${c} accès."; echo ""
+}
+
+cmd_list_help() {
+    echo ""; bold "  sshk list — Lister les clés et accès SSH"; echo ""
+    echo "  Usage:"
+    echo "    sshk list             Tout (identités + accès)"
+    echo "    sshk list --keys      Seulement mes identités"
+    echo "    sshk list -k          Alias de --keys"
+    echo "    sshk list --auth      Seulement les accès entrants"
+    echo "    sshk list -a          Alias de --auth"
+    echo ""
+    echo "  Sources lues :"
+    echo "    ~/.ssh/keys/             identités personnelles"
+    echo "    ~/.ssh/authorized_keys.d/ accès accordés par d'autres"
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_show() {
+    case "${1:-}" in --help|-h) cmd_show_help; return ;; esac
+    local name="${1:-}"; [[ -z "$name" ]] && { err "Usage: sshk show <nom>"; exit 1; }
+    key_exists "$name" || { err "Identité '$name' introuvable."; echo ""; cmd_list -k; exit 1; }
+
+    local t fp cm dt hn cf; t=$(key_type "$name"); fp=$(key_fp "$name"); cm=$(key_comment "$name") || true
+    dt=$(key_date "$name") || true; hn=$(key_hostname "$name") || true; cf=$(config_for "$name") || true
+
+    echo ""; bold "  🔑  $name"; div 48
+    echo -e "  Type       : ${C_BLUE}$t${C_RESET}"
+    echo -e "  Empreinte  : ${C_YELLOW}$fp${C_RESET}"
+    echo -e "  Comment    : $cm"
+    echo -e "  Créée le   : $dt"
+    echo -e "  Chemin     : ${C_BLUE}$(key_file "$name")${C_RESET}"
+    [[ -n "$cf" ]] && { echo -e "  Config     : ${C_BLUE}$cf${C_RESET}"; echo -e "    HostName : ${C_GREEN}$hn${C_RESET}"; }
+    div 48
+    echo ""
+    [[ -n "$hn" ]] && echo -e "  ssh         : ${C_BLUE}ssh $name${C_RESET}"
+    echo -e "  copier      : ${C_BLUE}sshk copy $name${C_RESET}"
+    echo -e "  supprimer   : ${C_BLUE}sshk delete $name${C_RESET}"
+    echo ""
+}
+
+cmd_show_help() {
+    echo ""; bold "  sshk show — Afficher les détails d'une identité"; echo ""
+    echo "  Usage: sshk show <nom>"
+    echo "  Affiche le type, l'empreinte, le commentaire, la date,"
+    echo "  le chemin, et la configuration SSH associée."
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_copy() {
+    case "${1:-}" in --help|-h) cmd_copy_help; return ;; esac
+    local name="${1:-}"; [[ -z "$name" ]] && { err "Usage: sshk copy <nom>"; exit 1; }
+    key_exists "$name" || { err "Identité '$name' introuvable."; exit 1; }
+    local pub; pub="$(< "$(key_file "$name").pub")"
+    if clipboard_copy "$pub"; then
+        ok "Clé publique copiée (${C_BOLD}$name${C_RESET})."
+    else
+        echo ""; warn "Presse-papier non détecté."; echo ""; div 56; echo "  $pub"; div 56
+        echo ""; info "Copiez manuellement ci-dessus."
+    fi
+    echo ""
+}
+
+cmd_copy_help() {
+    echo ""; bold "  sshk copy — Copier une clé publique"; echo ""
+    echo "  Usage: sshk copy <nom>"
+    echo "  Copie la clé publique dans le presse-papier (pbcopy / wl-copy / xclip)."
+    echo "  Exemple: sshk copy github  → prêt à coller sur github.com/settings/keys"
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_delete() {
+    case "${1:-}" in --help|-h) cmd_delete_help; return ;; esac
+    local name="${1:-}"; [[ -z "$name" ]] && { err "Usage: sshk delete <nom>"; exit 1; }
+    key_exists "$name" || { err "Identité '$name' introuvable."; exit 1; }
+    local cm cf; cm=$(key_comment "$name") || true; cf=$(config_for "$name") || true
+
+    echo ""; bold "  ⚠️  Supprimer '$name' ?"; div 48
+    echo -e "  Type       : ${C_BLUE}$(key_type "$name")${C_RESET}"
+    echo -e "  Comment    : $cm"; div 48; echo ""
+    echo -e "  ${C_RED}Supprimera :${C_RESET}"
+    echo -e "    ${C_BLUE}~/.ssh/keys/$name/${C_RESET}"
+    [[ -n "$cf" ]] && echo -e "    ${C_BLUE}$cf${C_RESET}"
+    echo ""
+    read -p "  Taper '$name' pour confirmer : " CF
+    [[ "$CF" != "$name" ]] && { info "Annulé."; exit 0; }
+    rm -rf "$(key_dir "$name")"
+    [[ -n "$cf" ]] && rm -f "$cf"
+    ok "Identité '$name' supprimée."; echo ""
+}
+
+cmd_delete_help() {
+    echo ""; bold "  sshk delete — Supprimer une identité"; echo ""
+    echo "  Usage: sshk delete <nom>"
+    echo "  ⚠️  Irréversible : supprime la clé privée, publique, et le fichier config.d/."
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_grant() {
+    case "${1:-}" in --help|-h) cmd_grant_help; return ;; esac
+    local name="${1:-}"; [[ -z "$name" ]] && { err "Usage: sshk grant <nom>"; exit 1; }
+    echo ""; grant_key "$name" || exit 1
+    echo ""; ok "Prêt. Testez avec ${C_BOLD}ssh $name${C_RESET}."; echo ""
+}
+
+cmd_grant_help() {
+    echo ""; bold "  sshk grant — Autoriser une machine distante"; echo ""
+    echo "  Usage: sshk grant <nom>"
+    echo ""
+    echo "  Étapes :"
+    echo "    1. Vérifie que ~/.ssh/keys/<nom>/id_ed25519 existe"
+    echo "    2. ssh-copy-id vers la machine distante"
+    echo "    3. Renomme proprement dans ~/.ssh/authorized_keys.d/"
+    echo ""
+    echo "  Prérequis côté serveur :"
+    echo "    mkdir -p ~/.ssh/authorized_keys.d"
+    echo "    echo 'AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys.d/*' | sudo tee -a /etc/ssh/sshd_config"
+    echo "    sudo systemctl restart sshd"
+    echo ""
+    echo "  Exemple :"
+    echo "    sshk grant void"
+    echo "    → La clé locale est copiée dans authorized_keys.d/macbook sur Void"
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_revoke() {
+    case "${1:-}" in --help|-h) cmd_revoke_help; return ;; esac
+    local name="${1:-}"; [[ -z "$name" ]] && { err "Usage: sshk revoke <nom>"; exit 1; }
+
+    # Récupérer le HostName depuis la config locale
+    local hn; hn=$(key_hostname "$name") || true
+    [[ -z "$hn" ]] && { err "Pas de HostName configuré pour '$name'. Impossible de déterminer la machine distante."; exit 1; }
+
+    # Trouver quel fichier authorized_keys.d/ correspond (via le commentaire de la clé locale)
+    local comment; comment=$(key_comment "$name" 2>/dev/null) || true
+    local auth_name="${comment#*@}"
+    [[ -z "$auth_name" ]] && auth_name="nova"
+
+    echo ""; bold "  ⚠️  Révoquer l'accès de '$auth_name' sur $name ?"; echo ""
+
+    if ssh "$name" "[[ -f ~/.ssh/authorized_keys.d/$auth_name ]]" 2>/dev/null; then
+        ssh "$name" "cat ~/.ssh/authorized_keys.d/$auth_name" 2>/dev/null | while IFS= read -r line; do
+            local fp; fp=$(echo "$line" | ssh-keygen -lf /dev/stdin 2>/dev/null | awk '{print $2}')
+            echo -e "  Empreinte : ${C_YELLOW}${fp:-inconnue}${C_RESET}"
+        done
+    else
+        warn "Aucun accès trouvé pour '$auth_name' sur $name."
+        echo ""; return
+    fi
+
+    echo ""
+    read -p "  Taper '$auth_name' pour confirmer : " CF
+    [[ "$CF" != "$auth_name" ]] && { info "Annulé."; exit 0; }
+
+    ssh "$name" "rm -f ~/.ssh/authorized_keys.d/$auth_name" 2>/dev/null &&
+        ok "Accès révoqué : ${C_BOLD}$auth_name${C_RESET} → ${C_BOLD}$name${C_RESET}." ||
+        err "Échec de la révocation."
+    echo ""
+}
+
+cmd_revoke_help() {
+    echo ""; bold "  sshk revoke — Révoquer l'accès d'une machine"; echo ""
+    echo "  Usage: sshk revoke <nom>"
+    echo "  Supprime la clé publique du fichier authorized_keys.d/ sur la machine distante."
+    echo "  ⚠️  La connexion SSH vers cette machine sera immédiatement coupée."
+    echo ""
+}
+
+# ───────────────────────────────────────────────────────────────
+
+cmd_help() {
+    echo ""
+    bold "  🔑  sshk — Gestionnaire de clés SSH"
+    echo ""
+    echo    "  Usage : sshk <commande> [options]"
+    echo ""
+    echo -e "  ${C_BOLD}Identités (sortant)${C_RESET}"
+    div 48
+    echo -e "  ${C_GREEN}create${C_RESET}          Assistant interactif de création"
+    echo -e "  ${C_GREEN}list${C_RESET}            Lister tout (identités + accès)"
+    echo -e "  ${C_GREEN}list --keys${C_RESET}     Seulement mes identités"
+    echo -e "  ${C_GREEN}list --auth${C_RESET}     Seulement les accès entrants"
+    echo -e "  ${C_GREEN}show <nom>${C_RESET}      Détails d'une identité"
+    echo -e "  ${C_GREEN}copy <nom>${C_RESET}      Copier la clé publique"
+    echo -e "  ${C_GREEN}delete <nom>${C_RESET}    Supprimer une identité"
+    echo ""
+    echo -e "  ${C_BOLD}Accès (entrant)${C_RESET}"
+    div 48
+    echo -e "  ${C_GREEN}grant <nom>${C_RESET}     Autoriser une machine distante"
+    echo -e "  ${C_GREEN}revoke <nom>${C_RESET}    Révoquer l'accès"
+    echo ""
+    echo -e "  ${C_BOLD}Autres${C_RESET}"
+    div 48
+    echo -e "  ${C_GREEN}help${C_RESET}            Cette aide"
+    echo -e "  ${C_GREEN}<cmd> --help${C_RESET}    Aide détaillée par commande"
+    echo ""
+    echo -e "  ${C_DIM}Structure${C_RESET}"
+    echo    "    ~/.ssh/keys/<nom>/id_ed25519       identités"
+    echo    "    ~/.ssh/config.d/<NN>-<nom>.conf    config sortante"
+    echo    "    ~/.ssh/authorized_keys.d/<nom>     accès entrants"
+    echo ""
+}
+
+# ═══════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════
+
+command -v ssh-keygen &>/dev/null || { err "ssh-keygen est requis."; exit 1; }
+
+case "${1:-help}" in
+    create)               shift; cmd_create "$@" ;;
+    list|ls)              shift; cmd_list "$@" ;;
+    show|info)            shift; cmd_show "$@" ;;
+    copy|cp)              shift; cmd_copy "$@" ;;
+    delete|rm|remove)     shift; cmd_delete "$@" ;;
+    grant|authorize)      shift; cmd_grant "$@" ;;
+    revoke)               shift; cmd_revoke "$@" ;;
+    -h|--help|help|"")    cmd_help ;;
+    *)                    err "Commande inconnue : '${1:-}'"; echo ""; cmd_help; exit 1 ;;
+esac
