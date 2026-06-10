@@ -132,7 +132,11 @@ cmd_create() {
     fi
 
     echo ""
-    read -p "  › Type     [1=ed25519, 2=rsa] : " TC
+    echo -e "  Types disponibles :"
+    echo -e "    ${C_BOLD}1${C_RESET} — ${C_GREEN}ed25519${C_RESET} (${C_DIM}recommandé — moderne, rapide, sécurisé${C_RESET})"
+    echo -e "    ${C_BOLD}2${C_RESET} — ${C_BLUE}rsa 4096${C_RESET} (${C_DIM}compatibilité maximale, plus lent${C_RESET})"
+    echo ""
+    read -p "  › Type     [1=ed25519, 2=rsa4096] : " TC
     case "$TC" in 2) TYPE="rsa"; BITS="-b 4096"; TL="rsa" ;; *) TYPE="ed25519"; BITS=""; TL="ed25519" ;; esac
 
     read -p "  › Comment  [sofian@$NAME] : " COMMENT; COMMENT=${COMMENT:-sofian@$NAME}
@@ -157,21 +161,15 @@ cmd_create() {
     chmod 600 "$(key_dir "$NAME")/id_$TL"
 
     if [[ -n "$HN" ]]; then
-        local n=10
-        for f in "$CONFIG_DIR"/*.conf; do
-            [[ -f "$f" ]] || continue
-            local num; num=$(basename "$f" | cut -d- -f1)
-            [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge "$n" ]] && n=$(( (num/10 + 1) * 10 ))
-        done
-        cat > "$CONFIG_DIR/${n}-${NAME}.conf" << EOF
+        cat > "$CONFIG_DIR/${NAME}.conf" << EOF
 Host $NAME
     HostName $HN
     User sofian
     IdentityFile ~/.ssh/keys/$NAME/id_$TL
     IdentitiesOnly yes
 EOF
-        chmod 600 "$CONFIG_DIR/${n}-${NAME}.conf"
-        ok "Fichier créé : ~/.ssh/config.d/${n}-${NAME}.conf"
+        chmod 600 "$CONFIG_DIR/${NAME}.conf"
+        ok "Fichier créé : ~/.ssh/config.d/${NAME}.conf"
     fi
 
     echo ""
@@ -202,7 +200,7 @@ cmd_create_help() {
     echo ""
     echo "  Résultat :"
     echo "    ~/.ssh/keys/<nom>/id_ed25519       paire de clés"
-    echo "    ~/.ssh/config.d/<NN>-<nom>.conf    config SSH (si HostName fourni)"
+    echo "    ~/.ssh/config.d/<nom>.conf         config SSH (si HostName fourni)"
     echo ""
 }
 
@@ -486,7 +484,7 @@ cmd_help() {
     echo ""
     echo -e "  ${C_DIM}Structure${C_RESET}"
     echo    "    ~/.ssh/keys/<nom>/id_ed25519       identités"
-    echo    "    ~/.ssh/config.d/<NN>-<nom>.conf    config sortante"
+    echo    "    ~/.ssh/config.d/<nom>.conf            config sortante"
     echo    "    ~/.ssh/authorized_keys.d/<nom>     accès entrants"
     echo ""
 }
