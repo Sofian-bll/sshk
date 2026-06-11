@@ -141,6 +141,12 @@ cmd_create() {
 
     read -p "  › Comment  [sofian@$NAME] : " COMMENT; COMMENT=${COMMENT:-sofian@$NAME}
     read -p "  › HostName (laisser vide si sshk ne contacte pas cette machine) : " HN
+    # GitHub: auto-config avec HostName et User connus
+    if [[ "$NAME" == "github" && -z "$HN" ]]; then
+        HN="github.com"
+        GH_USER="git"
+        HN_AUTO=true
+    fi
 
     echo ""
     div 48
@@ -161,10 +167,28 @@ cmd_create() {
     chmod 600 "$(key_dir "$NAME")/id_$TL"
 
     if [[ -n "$HN" ]]; then
+<<<<<<< HEAD
         cat > "$CONFIG_DIR/${NAME}.conf" << EOF
 Host $NAME
+=======
+        local n=10
+        for f in "$CONFIG_DIR"/*.conf; do
+            [[ -f "$f" ]] || continue
+            local num; num=$(basename "$f" | cut -d- -f1)
+            [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge "$n" ]] && n=$(( (num/10 + 1) * 10 ))
+        done
+        GH_U="${GH_USER:-sofian}"
+        # GitHub uses Host=HostName (both github.com), machines use Host=NAME (ssh vela)
+        if [[ "$NAME" == "github" ]]; then
+            SSH_HOST="$HN"
+        else
+            SSH_HOST="$NAME"
+        fi
+        cat > "$CONFIG_DIR/${n}-${NAME}.conf" << EOF
+Host $SSH_HOST
+>>>>>>> 87d5212 (sync)
     HostName $HN
-    User sofian
+    User $GH_U
     IdentityFile ~/.ssh/keys/$NAME/id_$TL
     IdentitiesOnly yes
 EOF
