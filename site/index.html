@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sshk — SSH Key Manager</title>
+<style>
+  :root {
+    --bg: #090c10;
+    --bg-surface: #0f1419;
+    --bg-elevated: #151b23;
+    --border: #1e2a33;
+    --text: #d6d9de;
+    --text-dim: #697582;
+    --accent: #86e040;
+    --accent-dim: #4a7a24;
+    --blue: #7dabf8;
+    --yellow: #e5b550;
+    --red: #ee6a5f;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Terminal chrome ───────────────────────────────── */
+  .terminal {
+    max-width: 720px;
+    margin: 80px auto 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-elevated);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(134,224,64,0.08);
+  }
+  .term-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-dot.r { background: var(--red); }
+  .term-dot.y { background: var(--yellow); }
+  .term-dot.g { background: var(--accent); }
+  .term-title {
+    margin-left: 8px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .term-body {
+    padding: 24px 20px 20px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.75;
+    overflow-x: auto;
+  }
+  .term-body .g { color: var(--accent); }
+  .term-body .b { color: var(--blue); }
+  .term-body .y { color: var(--yellow); }
+  .term-body .d { color: var(--text-dim); }
+  .term-body .bold { font-weight: 700; color: #ffffff; }
+  .term-body .cursor::after {
+    content: "▋";
+    color: var(--accent);
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Hero ──────────────────────────────────────────── */
+  .site-header {
+    text-align: center;
+    padding: 40px 24px 0;
+  }
+  .site-header .overline {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .site-header h1 {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 8px 0 4px;
+  }
+  .site-header h1 .prompt { color: var(--accent); }
+  .site-header .tagline {
+    font-size: 1.05rem;
+    color: var(--text-dim);
+    max-width: 480px;
+    margin: 0 auto 12px;
+  }
+  .meta-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  .meta-row a {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .meta-row a:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+  /* ── Sections ──────────────────────────────────────── */
+  .section {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+  .section h2 {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .section .subtitle {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin-bottom: 32px;
+    max-width: 480px;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0 24px;
+    max-width: 672px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ── Tree ──────────────────────────────────────────── */
+  .tree {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.85;
+    color: var(--text-dim);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    overflow-x: auto;
+  }
+  .tree .t-accent { color: var(--accent); }
+  .tree .t-blue   { color: var(--blue); }
+  .tree .t-yellow { color: var(--yellow); }
+
+  /* ── Command grid ──────────────────────────────────── */
+  .cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .cmd-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .cmd-card:hover { border-color: var(--accent-dim); }
+  .cmd-card .cmd {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .cmd-card .desc {
+    font-size: 0.875rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* ── Code block ────────────────────────────────────── */
+  .code-block {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--text);
+    overflow-x: auto;
+    line-height: 1.9;
+  }
+  .code-block .prompt { color: var(--accent); user-select: none; }
+  .code-block .comment { color: var(--text-dim); }
+
+  /* ── Footer ────────────────────────────────────────── */
+  footer {
+    text-align: center;
+    padding: 48px 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+  }
+  footer a { color: var(--accent-dim); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    .terminal { margin: 40px 12px 0; }
+    .term-body { font-size: 11px; padding: 16px 14px; }
+    .site-header h1 { font-size: 1.8rem; }
+    .section { padding: 40px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="overline">SSH Key Manager</div>
+  <h1><span class="prompt">$</span> sshk</h1>
+  <p class="tagline">Structured SSH keys. One identity per directory. Zero dependencies beyond OpenSSH.</p>
+  <div class="meta-row">
+    <a href="https://github.com/Sofian-bll/sshk">★ 1 star</a>
+    <a href="https://github.com/Sofian-bll/sshk">MIT License</a>
+    <a href="https://github.com/Sofian-bll/sshk">View on GitHub →</a>
+  </div>
+</header>
+
+<!-- Hero terminal -->
+<div class="terminal" id="hero-term">
+  <div class="term-bar">
+    <span class="term-dot r"></span>
+    <span class="term-dot y"></span>
+    <span class="term-dot g"></span>
+    <span class="term-title">sshk list</span>
+  </div>
+  <div class="term-body" id="term-content">
+  </div>
+</div>
+
+<script>
+(function() {
+  // Animate the terminal typing effect
+  var lines = [
+    '',
+    '<span class="bold">  \uD83D\uDD11  Clés SSH</span>',
+    '<span class="d">  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>',
+    '',
+    '<span class="bold">  NOM          TYPE      EMPREINTE                  CRÉÉ</span>',
+    '<span class="d">  ──────────────────────────────────────────────────────</span>',
+    '  <span class="g">github</span>       <span class="b">ed25519</span>   <span class="y">SHA256:nsUEso4Nmj...</span>     03/03  ',
+    '  <span class="g">vela</span>         <span class="b">ed25519</span>   <span class="y">SHA256:s7N3UmaxVj...</span>     01/06  ',
+    '  <span class="g">void</span>         <span class="b">ed25519</span>   <span class="y">SHA256:gszkY2sWRq...</span>     01/06  ',
+    '  <span class="g">macbook</span>      <span class="g">🔓 accès</span>   <span class="y">SHA256:aB3x9Kp...</span>        11/06  ',
+    '',
+    '<span class="d">  ℹ  3 clé(s), 1 accès.<span class="cursor"></span></span>',
+    '',
+  ];
+
+  var el = document.getElementById('term-content');
+  var i = 0;
+  var speed = 18;
+
+  function type() {
+    if (i >= lines.length) return;
+    // Insert the line
+    var div = document.createElement('div');
+    div.innerHTML = lines[i];
+    el.appendChild(div);
+    i++;
+    // Scroll to bottom
+    el.scrollTop = el.scrollHeight;
+    // Next line — faster for empty lines, slower for content
+    var delay = lines[i-1] === '' ? speed * 0.5 : (i === lines.length ? speed * 3 : speed * 4);
+    setTimeout(type, delay);
+  }
+
+  type();
+})();
+</script>
+
+<!-- What problem -->
+<section class="section">
+  <h2>$ ls ~/.ssh</h2>
+  <p class="subtitle">The flat key nightmare. Which key is for which server? Which server has which key? When did you create them?</p>
+</section>
+<hr>
+
+<!-- The tree -->
+<section class="section">
+  <h2>$ tree ~/.ssh</h2>
+  <p class="subtitle">sshk gives each identity its own directory. Keys, configs, and authorized entries are namespaced and predictable.</p>
+  <div class="tree">
+<span class="t-yellow">~/.ssh/</span><br>
+├── <span class="t-blue">keys/</span>                    <span class="t-accent"># Your identities</span><br>
+│&nbsp;&nbsp; ├── <span class="t-yellow">github/</span><br>
+│&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="t-accent">id_ed25519</span><br>
+│&nbsp;&nbsp; ├── <span class="t-yellow">vela/</span><br>
+│&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="t-accent">id_ed25519</span><br>
+│&nbsp;&nbsp; └── <span class="t-yellow">void/</span><br>
+│&nbsp;&nbsp; &nbsp;&nbsp; └── <span class="t-accent">id_ed25519</span><br>
+├── <span class="t-blue">config.d/</span>               <span class="t-accent"># SSH config snippets</span><br>
+│&nbsp;&nbsp; ├── <span class="t-yellow">github.conf</span><br>
+│&nbsp;&nbsp; └── <span class="t-yellow">vela.conf</span><br>
+└── <span class="t-blue">authorized_keys.d/</span>      <span class="t-accent"># Who can connect</span><br>
+&nbsp;&nbsp;&nbsp; └── <span class="t-yellow">macbook</span>
+  </div>
+</section>
+<hr>
+
+<!-- Commands -->
+<section class="section">
+  <h2>$ sshk help</h2>
+  <p class="subtitle">One command per action. Interactive wizards for creation and setup.</p>
+  <div class="cmd-grid">
+    <div class="cmd-card">
+      <div class="cmd">$ sshk create</div>
+      <div class="desc">Interactive wizard. Pick ed25519 or RSA, set HostName and comment. Keys and config written automatically.</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd">$ sshk list</div>
+      <div class="desc">See all your identities and who has access. Fingerprints, types, dates — everything at a glance.</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd">$ sshk grant &lt;name&gt;</div>
+      <div class="desc">Push a public key to a remote server via ssh-copy-id. Organizes authorized_keys.d/ cleanly.</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd">$ sshk revoke &lt;name&gt;</div>
+      <div class="desc">Remove a machine's access remotely. One command, instant revocation.</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd">$ sshk copy &lt;name&gt;</div>
+      <div class="desc">Copy a public key to clipboard. Paste into GitHub, GitLab, or any service.</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd">$ sshk show &lt;name&gt;</div>
+      <div class="desc">Full details: fingerprint, path, config, HostName. Everything you need to debug a connection.</div>
+    </div>
+  </div>
+</section>
+<hr>
+
+<!-- Install -->
+<section class="section">
+  <h2>$ curl install.sh | bash</h2>
+  <p class="subtitle">One command. Installs to <code>~/.local/bin</code>. Requires OpenSSH, nothing else.</p>
+  <div class="code-block">
+<span class="prompt">$ </span>curl -fsSL https://raw.githubusercontent.com/Sofian-bll/sshk/main/install.sh | bash
+<br><br><span class="prompt">$ </span><span class="comment"># Make sure ~/.local/bin is in your PATH, then:</span>
+<br><span class="prompt">$ </span>sshk create          <span class="comment"># Create your first SSH identity</span>
+<br><span class="prompt">$ </span>sshk list            <span class="comment"># List everything</span>
+<br><span class="prompt">$ </span>sshk grant server    <span class="comment"># Grant access to a server</span>
+  </div>
+</section>
+<hr>
+
+<!-- Server setup -->
+<section class="section">
+  <h2>$ sshd_config</h2>
+  <p class="subtitle">Server-side setup for grant/revoke. Run once per server.</p>
+  <div class="code-block">
+<span class="prompt">$ </span>mkdir -p ~/.ssh/authorized_keys.d
+<br><span class="prompt">$ </span>chmod 700 ~/.ssh/authorized_keys.d
+<br><span class="prompt"># </span>echo 'AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys.d/*' | sudo tee -a /etc/ssh/sshd_config
+<br><span class="prompt">$ </span>sudo systemctl restart sshd
+  </div>
+</section>
+
+<footer>
+  sshk is <a href="https://github.com/Sofian-bll/sshk">open source</a> (MIT) — pure Bash, zero dependencies — built for homelab operators and developers who manage many SSH keys
+</footer>
+
+</body>
+</html>
