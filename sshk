@@ -5,9 +5,34 @@
 
 set -euo pipefail
 
-readonly KEYS_DIR="$HOME/.ssh/keys"
-readonly AUTH_DIR="$HOME/.ssh/authorized_keys.d"
-readonly CONFIG_DIR="$HOME/.ssh/config.d"
+readonly SSHK_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sshk"
+readonly SSHK_CONFIG_FILE="$SSHK_CONFIG_DIR/config"
+
+if [[ -f "$SSHK_CONFIG_FILE" ]]; then
+    source "$SSHK_CONFIG_FILE"
+else
+    mkdir -p "$SSHK_CONFIG_DIR"
+    cat > "$SSHK_CONFIG_FILE" << 'SSHKCONF'
+# sshk configuration
+# See https://github.com/Sofian-bll/sshk#configuration
+
+# Default key type: ed25519 (recommended) or rsa
+SSHK_DEFAULT_TYPE=ed25519
+
+# Default SSH user for HostName blocks (e.g. "git" for github.com)
+# SSHK_DEFAULT_USER=
+
+# Override default directories (optional)
+# SSHK_KEYS_DIR=$HOME/.ssh/keys
+# SSHK_AUTH_DIR=$HOME/.ssh/authorized_keys.d
+# SSHK_CONFIG_DIR=$HOME/.ssh/config.d
+SSHKCONF
+    source "$SSHK_CONFIG_FILE"
+fi
+
+readonly KEYS_DIR="${SSHK_KEYS_DIR:-$HOME/.ssh/keys}"
+readonly AUTH_DIR="${SSHK_AUTH_DIR:-$HOME/.ssh/authorized_keys.d}"
+readonly CONFIG_DIR="${SSHK_CONFIG_DIR:-$HOME/.ssh/config.d}"
 readonly SCRIPT="sshk"
 
 # ── Palette (Vesper) ──────────────────────────────────────────
@@ -136,15 +161,16 @@ cmd_create() {
     echo -e "    ${C_BOLD}1${C_RESET} — ${C_GREEN}ed25519${C_RESET} (${C_DIM}recommandé — moderne, rapide, sécurisé${C_RESET})"
     echo -e "    ${C_BOLD}2${C_RESET} — ${C_BLUE}rsa 4096${C_RESET} (${C_DIM}compatibilité maximale, plus lent${C_RESET})"
     echo ""
-    read -p "  › Type     [1=ed25519, 2=rsa4096] : " TC
+    local DT; [[ "${SSHK_DEFAULT_TYPE:-ed25519}" == "rsa" ]] && DT="2" || DT="1"
+    read -p "  › Type     [1=ed25519, 2=rsa4096] [$DT] : " TC
+    TC="${TC:-$DT}"
     case "$TC" in 2) TYPE="rsa"; BITS="-b 4096"; TL="rsa" ;; *) TYPE="ed25519"; BITS=""; TL="ed25519" ;; esac
 
-    read -p "  › Comment  [sofian@$NAME] : " COMMENT; COMMENT=${COMMENT:-sofian@$NAME}
+    read -p "  › Comment  [${SSHK_DEFAULT_USER:-${USER:-sofian}}@$NAME] : " COMMENT
+    COMMENT="${COMMENT:-${SSHK_DEFAULT_USER:-${USER:-sofian}}@$NAME}"
     read -p "  › HostName (laisser vide si sshk ne contacte pas cette machine) : " HN
-    # GitHub: auto-config avec HostName et User connus
     if [[ "$NAME" == "github" && -z "$HN" ]]; then
         HN="github.com"
-        GH_USER="git"
         HN_AUTO=true
     fi
 
@@ -167,28 +193,16 @@ cmd_create() {
     chmod 600 "$(key_dir "$NAME")/id_$TL"
 
     if [[ -n "$HN" ]]; then
-<<<<<<< HEAD
+        local SSH_USER
+        if [[ "$NAME" == "github" ]]; then
+            SSH_USER="git"
+        else
+            SSH_USER="${SSHK_DEFAULT_USER:-${USER:-sofian}}"
+        fi
         cat > "$CONFIG_DIR/${NAME}.conf" << EOF
 Host $NAME
-=======
-        local n=10
-        for f in "$CONFIG_DIR"/*.conf; do
-            [[ -f "$f" ]] || continue
-            local num; num=$(basename "$f" | cut -d- -f1)
-            [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge "$n" ]] && n=$(( (num/10 + 1) * 10 ))
-        done
-        GH_U="${GH_USER:-sofian}"
-        # GitHub uses Host=HostName (both github.com), machines use Host=NAME (ssh vela)
-        if [[ "$NAME" == "github" ]]; then
-            SSH_HOST="$HN"
-        else
-            SSH_HOST="$NAME"
-        fi
-        cat > "$CONFIG_DIR/${n}-${NAME}.conf" << EOF
-Host $SSH_HOST
->>>>>>> 87d5212 (sync)
     HostName $HN
-    User $GH_U
+    User $SSH_USER
     IdentityFile ~/.ssh/keys/$NAME/id_$TL
     IdentitiesOnly yes
 EOF
@@ -508,8 +522,11 @@ cmd_help() {
     echo ""
     echo -e "  ${C_DIM}Structure${C_RESET}"
     echo    "    ~/.ssh/keys/<nom>/id_ed25519       identités"
-    echo    "    ~/.ssh/config.d/<nom>.conf            config sortante"
+    echo    "    ~/.ssh/config.d/<nom>.conf         config sortante"
     echo    "    ~/.ssh/authorized_keys.d/<nom>     accès entrants"
+    echo ""
+    echo -e "  ${C_DIM}Configuration${C_RESET}"
+    echo    "    ~/.config/sshk/config              options personnalisables"
     echo ""
 }
 
