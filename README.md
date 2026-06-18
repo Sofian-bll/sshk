@@ -1,10 +1,12 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" alt="sshk logo" width="150" />
+
 # sshk
 
 **SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.**
 
-[![License: MIT](https://img.shields.io/github/license/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/blob/main/README.md)
+[![License: MIT](https://img.shields.io/github/license/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/releases)
 [![Stars](https://img.shields.io/github/stars/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/stargazers)
 
@@ -13,6 +15,10 @@
 ## What is this?
 
 `sshk` brings order to your SSH keys with a predictable directory structure — one identity per purpose, one command per action. Manage outgoing identities (keys you use to connect to other machines) and incoming access (keys that can connect to you) with the same tool. Zero dependencies beyond OpenSSH.
+
+<p align="center">
+  <img src="docs/screenshots/sshk-list.png" alt="sshk list command output" width="720" />
+</p>
 
 ## Quick Start
 
@@ -157,15 +163,18 @@ sudo systemctl restart sshd
 
 ```
 sshk/
+├── docs/            # GitHub Pages landing page and assets
 ├── install.sh      # One-line installer via curl
 ├── README.md       # This file
-└── sskhk           # Main script (~500 lines, Bash)
+├── LICENSE         # MIT license
+└── sshk            # Main script (~550 lines, Bash)
 ```
 
 ## Documentation
 
 | Resource | Description |
 |----------|-------------|
+| [`docs/index.html`](docs/index.html) | GitHub Pages landing page |
 | `sshk` | Main script — all commands, key helpers, clipboard support |
 | `install.sh` | One-line installer for `~/.local/bin` |
 
@@ -179,7 +188,7 @@ PRs and issues welcome. Found a bug or have an idea? [Open an issue](https://git
 
 ## License
 
-MIT
+[MIT](LICENSE)
 
 ---
 
