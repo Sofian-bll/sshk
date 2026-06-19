@@ -1,6 +1,8 @@
+> [Lire en Francais](README.md) | [Read in English](README.en.md)
+
 <div align="center">
 
-![[docs/assets/logo.png|150]]
+<img src="docs/assets/logo.png" width="150" alt="sshk logo"/>
 
 # sshk
 
@@ -16,7 +18,7 @@
 
 `sshk` brings order to your SSH keys with a predictable directory structure — one identity per purpose, one command per action. Manage outgoing identities (keys you use to connect to other machines) and incoming access (keys that can connect to you) with the same tool. Zero dependencies beyond OpenSSH.
 
-![[docs/screenshots/sshk-list.png|720]]
+<img src="docs/screenshots/sshk-list.png" width="720" alt="sshk list"/>
 
 ## Quick Start
 
