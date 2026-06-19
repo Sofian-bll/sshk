@@ -1,544 +1,207 @@
-<!doctype html>
-<html lang="en" class="scroll-smooth">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>sshk — SSH Key Manager</title>
-  <meta name="description" content="A pure Bash SSH key manager for creating, organizing, granting, and revoking SSH keys.">
-  <meta name="theme-color" content="#090c10">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>sshk — SSH Key Manager</title>
+<style>
+  :root {
+    --bg: #1a1b26;
+    --surface: #24283b;
+    --text: #c0caf5;
+    --muted: #565f89;
+    --accent: #7aa2f7;
+    --green: #9ece6a;
+    --border: #36405a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  .container { max-width: 740px; margin: 0 auto; padding: 0 24px; }
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="sshk — SSH Key Manager">
-  <meta property="og:description" content="A pure Bash SSH key manager for creating, organizing, granting, and revoking SSH keys.">
-  <meta property="og:image" content="assets/logo.png">
-  <meta property="og:type" content="website">
+  header {
+    padding: 72px 0 48px;
+    text-align: center;
+  }
+  .header-logo { width: 96px; height: 96px; margin-bottom: 20px; }
+  h1 {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 2.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle { font-size: 1rem; color: var(--muted); max-width: 420px; margin: 0 auto 20px; }
+  .badges {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 0.7rem; font-weight: 600; padding: 4px 10px;
+    border-radius: 16px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .badge.hl { color: var(--accent); border-color: var(--accent); }
 
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="sshk — SSH Key Manager">
-  <meta name="twitter:description" content="A pure Bash SSH key manager for creating, organizing, granting, and revoking SSH keys.">
-  <meta name="twitter:image" content="assets/logo.png">
+  .terminal {
+    background: #1a1b26;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 48px;
+    box-shadow: 0 0 40px rgba(122,162,247,0.06);
+  }
+  .terminal-bar {
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .terminal-bar span { width: 11px; height: 11px; border-radius: 50%; background: #444; }
+  .terminal-bar span:nth-child(1) { background: #f7768e; }
+  .terminal-bar span:nth-child(2) { background: #e0af68; }
+  .terminal-bar span:nth-child(3) { background: #9ece6a; }
+  .terminal-bar .tname {
+    margin-left: 12px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-family: monospace;
+  }
+  .terminal-body {
+    padding: 20px 22px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.9;
+    overflow-x: auto;
+  }
+  .terminal-body .pr { color: var(--green); }
+  .terminal-body .cmd { color: var(--accent); }
+  .terminal-body .out { color: var(--muted); }
 
-  <link rel="icon" type="image/png" href="assets/logo.png">
+  section { padding: 40px 0; }
+  section + section { border-top: 1px solid var(--border); }
+  h2 { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); }
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            bg: '#090c10',
-            surface: '#0f1419',
-            elevated: '#151b23',
-            border: '#1e2a33',
-            text: '#d6d9de',
-            muted: '#697582',
-            accent: '#86e040',
-            'accent-dim': '#4a7a24',
-            blue: '#7dabf8',
-            yellow: '#e5b550',
-          }
-        }
-      }
-    }
-  </script>
+  .cmds {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .cmd-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: monospace;
+  }
+  .cmd-card .cname { color: var(--accent); font-weight: 700; }
+  .cmd-card .cdesc { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
 
-  <style>
-    :root {
-      --bg: #090c10;
-      --surface: #0f1419;
-      --elevated: #151b23;
-      --border: #1e2a33;
-      --text: #d6d9de;
-      --muted: #697582;
-      --accent: #86e040;
-      --accent-dim: #4a7a24;
-      --blue: #7dabf8;
-      --yellow: #e5b550;
-    }
+  .install-line {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: monospace;
+    font-size: 0.82rem;
+    overflow-x: auto;
+  }
+  .install-line .kw { color: var(--green); }
+  .install-line .url { color: var(--accent); }
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
+  .struct {
+    font-family: monospace;
+    font-size: 0.83rem;
+    color: var(--muted);
+    line-height: 1.8;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+  }
+  .struct .dir { color: var(--accent); }
 
-    .font-mono {
-      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
-    }
-
-    /* Scroll reveal styling */
-    .reveal {
-      opacity: 0;
-      transform: translateY(16px);
-      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .reveal.active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .reveal {
-        opacity: 1 !important;
-        transform: none !important;
-        transition: none !important;
-      }
-    }
-
-    /* Custom focus outlines matching visual system */
-    *:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 4px;
-    }
-
-    /* Pulse animation for the live marker */
-    @keyframes pulse-accent {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.9); }
-    }
-    .pulse-dot {
-      animation: pulse-accent 2s infinite ease-in-out;
-    }
-
-    /* Terminal Prompt Key Motif */
-    .key-prompt::before {
-      content: "▌";
-      display: inline-block;
-      margin-right: 0.5rem;
-      color: var(--accent);
-      font-size: 1.1em;
-      vertical-align: middle;
-    }
-
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: var(--bg);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--muted);
-    }
-  </style>
+  footer {
+    text-align: center; padding: 40px 0; font-size: 0.78rem;
+    color: var(--muted); border-top: 1px solid var(--border);
+  }
+</style>
 </head>
-<body class="min-h-screen flex flex-col selection:bg-accent-dim selection:text-white">
+<body>
 
-  <!-- 1. NAVIGATION -->
-  <header class="sticky top-0 z-50 bg-[#090c10]/95 backdrop-blur-md border-b border-border transition-colors duration-200">
-    <div class="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <a href="#" class="flex items-center gap-3 group focus:outline-none" aria-label="sshk home">
-        <!-- LOGO: docs/assets/logo.png -->
-        <img src="assets/logo.png" alt="sshk logo" class="w-8 h-8 rounded-lg object-contain bg-surface border border-border group-hover:border-accent-dim transition-colors duration-200">
-        <span class="font-mono text-lg font-bold tracking-tight text-white">sshk</span>
-      </a>
+<header class="container">
+  <img src="../assets/logo.svg" alt="sshk" class="header-logo"/>
+  <h1>sshk</h1>
+  <p class="subtitle">SSH Key Manager. Pure Bash. Zero deps. One identity per purpose, one command per action.</p>
+  <div class="badges">
+    <span class="badge hl">MIT</span>
+    <span class="badge">Bash</span>
+    <span class="badge">OpenSSH</span>
+  </div>
+</header>
 
-      <!-- PILLS -->
-      <nav class="flex items-center gap-2 sm:gap-3 flex-wrap justify-center text-xs font-mono">
-        <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-full bg-surface border border-border text-muted hover:text-text hover:border-accent-dim transition-all duration-200 focus:outline-none flex items-center gap-1.5">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-3.5 h-3.5" aria-hidden="true"><path d="M16 22.0268V19.1568C16.0375 18.68 15.9731 18.2006 15.811 17.7506C15.6489 17.3006 15.3929 16.8902 15.06 16.5468C18.2 16.1968 21.5 15.0068 21.5 9.54679C21.4997 8.15062 20.9627 6.80799 20 5.79679C20.4558 4.5753 20.4236 3.22514 19.91 2.02679C19.91 2.02679 18.73 1.67679 16 3.50679C13.708 2.88561 11.292 2.88561 8.99999 3.50679C6.26999 1.67679 5.08999 2.02679 5.08999 2.02679C4.57636 3.22514 4.54413 4.5753 4.99999 5.79679C4.03011 6.81549 3.49251 8.17026 3.49999 9.57679C3.49999 14.9968 6.79998 16.1868 9.93998 16.5768C9.61098 16.9168 9.35725 17.3222 9.19529 17.7667C9.03334 18.2112 8.96679 18.6849 8.99999 19.1568V22.0268" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 20.0267C6 20.9999 3.5 20.0267 2 17.0267" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          github
-        </a>
-        <a href="https://github.com/Sofian-bll/sshk/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-full bg-surface border border-border text-accent hover:border-accent transition-all duration-200 focus:outline-none flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-accent inline-block"></span>
-          v1.0.0
-        </a>
-        <a href="https://github.com/Sofian-bll/sshk/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-full bg-surface border border-border text-muted hover:text-text hover:border-accent-dim transition-all duration-200 focus:outline-none flex items-center gap-1.5">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-3.5 h-3.5" aria-hidden="true"><path d="M5 21V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V21L13.0815 17.1953C12.4227 16.7717 11.5773 16.7717 10.9185 17.1953L5 21Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          MIT
-        </a>
-      </nav>
+<div class="container">
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span></span><span></span><span></span>
+      <span class="tname">sshk</span>
     </div>
-  </header>
-
-  <main class="flex-grow">
-    <!-- 2. HERO -->
-    <section class="relative pt-16 pb-24 overflow-hidden">
-      <div class="max-w-5xl mx-auto px-5 sm:px-8 text-center">
-        <!-- Eyebrow Badge -->
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface border border-border text-xs font-mono mb-6 reveal">
-          <span class="w-2 h-2 rounded-full bg-accent pulse-dot"></span>
-          <span class="text-text tracking-wide uppercase">SSH Key Manager</span>
-        </div>
-
-        <!-- Headline -->
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 reveal leading-[1.1]">
-          Structured SSH keys,<br class="hidden sm:inline"> without the <span class="font-mono text-accent">~/.ssh</span> mess.
-        </h1>
-
-        <!-- Subheadline -->
-        <p class="max-w-2xl mx-auto text-base sm:text-lg text-muted mb-10 leading-relaxed reveal">
-          Create, organize, grant, and revoke SSH keys with one predictable Bash CLI. Pure Bash + OpenSSH, and zero dependencies.
-        </p>
-
-        <!-- CTAs -->
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20 reveal">
-          <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto px-6 py-3.5 rounded-full bg-accent text-bg hover:bg-[#a6f060] font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] text-center shadow-lg shadow-accent/10 focus:outline-none">
-            View repository
-          </a>
-          <a href="#quickstart" class="w-full sm:w-auto px-6 py-3.5 rounded-full bg-surface border border-border text-text hover:text-white hover:border-accent-dim font-mono text-xs transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] text-center focus:outline-none">
-            curl install.sh | bash
-          </a>
-        </div>
-
-        <!-- Main Visual: Hero Screenshot -->
-        <div class="reveal max-w-4xl mx-auto">
-          <div class="relative bg-surface border border-border rounded-[20px] p-1 shadow-2xl overflow-hidden group hover:border-accent-dim transition-colors duration-300">
-            <!-- Terminal Header -->
-            <div class="flex items-center justify-between px-4 py-3 bg-[#0c1015] rounded-t-[18px] border-b border-border/60">
-              <div class="flex gap-1.5">
-                <span class="w-3 h-3 rounded-full bg-[#ff5f56]"></span>
-                <span class="w-3 h-3 rounded-full bg-[#ffbd2e]"></span>
-                <span class="w-3 h-3 rounded-full bg-[#27c93f]"></span>
-              </div>
-              <span class="text-xs font-mono text-muted tracking-tight">sshk list</span>
-              <div class="w-12"></div>
-            </div>
-            <!-- Terminal Body -->
-            <div class="aspect-video w-full bg-[#05070a] rounded-b-[18px] overflow-hidden flex items-center justify-center p-4">
-              <!-- SCREENSHOT: docs/screenshots/sshk-list.png -->
-              <img src="screenshots/sshk-list.png" alt="Output of sshk list showing organized credentials and incoming machine entries" class="w-full h-full object-contain select-none" loading="eager">
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. PROBLEM / STRUCTURE -->
-    <section class="py-20 border-t border-border bg-[#0b0e12]/50">
-      <div class="max-w-6xl mx-auto px-5 sm:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-
-          <!-- Left: Problem text -->
-          <div class="lg:col-span-5 reveal">
-            <div class="font-mono text-accent text-xs mb-3 key-prompt">THE PROBLEM</div>
-            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-6 leading-tight">
-              The messy landscape of untracked credentials.
-            </h2>
-            <p class="text-muted leading-relaxed mb-6">
-              When every SSH key sits flat in <code class="text-yellow bg-surface px-1.5 py-0.5 rounded font-mono text-sm">~/.ssh</code>, context disappears: <code class="text-yellow bg-surface px-1.5 py-0.5 rounded font-mono text-sm">id_rsa</code>, <code class="text-yellow bg-surface px-1.5 py-0.5 rounded font-mono text-sm">id_ed25519</code>, forgotten server keys, and no clear ownership trail.
-            </p>
-            <p class="text-muted leading-relaxed mb-6">
-              <strong class="text-text">sshk gives every identity a namespace.</strong> Each key gets its own directory, optional config snippet, and clear purpose.
-            </p>
-            <div class="space-y-3 pt-2 font-mono text-xs text-muted">
-              <div class="flex items-center gap-2">
-                <span class="text-accent">▌</span> No central database or daemon
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-accent">▌</span> Operates purely on flat files
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-accent">▌</span> Portable state configuration
-              </div>
-            </div>
-          </div>
-
-          <!-- Right: Terminal tree panel -->
-          <div class="lg:col-span-7 reveal">
-            <div class="bg-surface border border-border rounded-[20px] shadow-xl overflow-hidden group hover:border-accent-dim transition-colors duration-300">
-              <div class="flex items-center justify-between px-5 py-4 bg-[#090c10] border-b border-border">
-                <div class="flex items-center gap-1.5">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
-                </div>
-                <span class="font-mono text-xs text-muted">tree ~/.ssh</span>
-                <div class="w-12"></div>
-              </div>
-              <div class="p-6 font-mono text-xs sm:text-sm overflow-x-auto text-text bg-bg leading-relaxed">
-                <pre class="text-left whitespace-pre min-w-max"><span class="text-blue">~/.ssh/</span>
-├── <span class="text-blue">keys/</span>                 <span class="text-muted"># identities</span>
-│   ├── <span class="text-blue">github/</span>
-│   │   └── id_ed25519
-│   └── <span class="text-blue">vela/</span>
-│       └── id_ed25519
-├── <span class="text-blue">config.d/</span>             <span class="text-muted"># host config</span>
-│   ├── github.conf
-│   └── vela.conf
-└── <span class="text-blue">authorized_keys.d/</span>    <span class="text-muted"># incoming access</span>
-    └── macbook</pre>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. COMMANDS -->
-    <section class="py-24 border-t border-border">
-      <div class="max-w-6xl mx-auto px-5 sm:px-8">
-
-        <div class="text-center max-w-2xl mx-auto mb-16 reveal">
-          <div class="font-mono text-accent text-xs mb-3 key-prompt">COMMAND INTERFACE</div>
-          <h2 class="text-3xl font-bold tracking-tight text-white mb-4">One predictable tool.</h2>
-          <p class="text-muted">Everything needed to configure credentials cleanly. Plain scripts, deterministic directory output.</p>
-        </div>
-
-        <!-- 7 Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-
-          <!-- Card 1 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk create</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Launches an interactive context-aware prompt to build a secure identity key pair without needing to remember manual SSH parameters.
-            </p>
-          </div>
-
-          <!-- Card 2 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk list</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Provides an immediate high-level overview of local private configurations alongside incoming authorized key associations at a single glance.
-            </p>
-          </div>
-
-          <!-- Card 3 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk show &lt;name&gt;</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Inspects configuration assets. Outputs public signatures, full storage locations, config rules, and assigned SSH aliases.
-            </p>
-          </div>
-
-          <!-- Card 4 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk copy &lt;name&gt;</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Safely targets and streams your specific public key payload onto your clipboard with direct cross-platform clipboard tooling support.
-            </p>
-          </div>
-
-          <!-- Card 5 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk grant &lt;name&gt;</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Deploys and updates authorized signatures securely onto the desired destination remote instances to safely permit authentication.
-            </p>
-          </div>
-
-          <!-- Card 6 -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300">
-            <div class="font-mono text-accent text-sm mb-3">sshk revoke &lt;name&gt;</div>
-            <p class="text-sm text-muted leading-relaxed">
-              Directly and programmatically drops targeted device entries from Remote host authorized lists, revoking host-level access paths.
-            </p>
-          </div>
-
-          <!-- Card 7 - Span 3 cols on Desktop, 2 on Tablet, 1 on Mobile to avoid empty spots -->
-          <div class="reveal bg-surface border border-border p-6 rounded-[20px] hover:border-accent-dim transition-all duration-300 md:col-span-2 lg:col-span-3">
-            <div class="font-mono text-accent text-sm mb-3">sshk delete &lt;name&gt;</div>
-            <p class="text-sm text-muted leading-relaxed max-w-2xl">
-              Permanently removes the selected identity directory and its matching SSH config after explicit confirmation.
-            </p>
-          </div>
-
-        </div>
-
-        <!-- Optional Command Reference Screenshot inside styled terminal card -->
-        <div class="reveal max-w-3xl mx-auto pt-8">
-          <div class="relative bg-surface border border-border rounded-[20px] p-1 shadow-lg overflow-hidden hover:border-accent-dim transition-colors duration-300">
-            <div class="flex items-center justify-between px-4 py-2 bg-[#0c1015] rounded-t-[18px] border-b border-border/60">
-              <span class="text-xs font-mono text-muted">sshk --help</span>
-            </div>
-            <div class="aspect-video w-full bg-[#05070a] rounded-b-[18px] overflow-hidden flex items-center justify-center p-4">
-              <!-- SCREENSHOT: docs/screenshots/sshk-help.png optional -->
-              <img src="screenshots/sshk-help.png" alt="Help terminal utility page showing all active parameters for sshk" class="w-full h-full object-contain select-none" loading="lazy">
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- 5. INSPECT AN IDENTITY -->
-    <section class="py-20 border-t border-border bg-[#0b0e12]/50">
-      <div class="max-w-5xl mx-auto px-5 sm:px-8 text-center">
-
-        <div class="max-w-2xl mx-auto mb-12 reveal">
-          <div class="font-mono text-accent text-xs mb-3 key-prompt">AUDIT CONFIDENTLY</div>
-          <h2 class="text-3xl font-bold tracking-tight text-white mb-4">Know exactly what each identity does.</h2>
-          <p class="text-muted">
-            The <code class="text-accent bg-surface px-1.5 py-0.5 rounded font-mono text-sm">sshk show</code> command yields cryptographic fingerprints, explicit metadata comments, creation dates, configuration rules, and relative hosts cleanly aligned.
-          </p>
-        </div>
-
-        <!-- Roomy container for secondary screenshot -->
-        <div class="reveal max-w-4xl mx-auto">
-          <div class="relative bg-[#05070a] border border-border rounded-[20px] p-1 shadow-2xl overflow-hidden hover:border-accent-dim transition-colors duration-300">
-            <!-- Terminal Header -->
-            <div class="flex items-center justify-between px-4 py-3 bg-[#0c1015] rounded-t-[18px] border-b border-border/60">
-              <div class="flex gap-1.5">
-                <span class="w-3 h-3 rounded-full bg-[#ff5f56]"></span>
-                <span class="w-3 h-3 rounded-full bg-[#ffbd2e]"></span>
-                <span class="w-3 h-3 rounded-full bg-[#27c93f]"></span>
-              </div>
-              <span class="text-xs font-mono text-muted tracking-tight">sshk show vela</span>
-              <div class="w-12"></div>
-            </div>
-            <!-- Terminal Body -->
-            <div class="aspect-video w-full bg-[#05070a] rounded-b-[18px] overflow-hidden flex items-center justify-center p-4">
-              <!-- SCREENSHOT: docs/screenshots/sshk-show.png -->
-              <img src="screenshots/sshk-show.png" alt="Detailed single key profile inspector output in terminal" class="w-full h-full object-contain select-none" loading="lazy">
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- 6. QUICK START -->
-    <section id="quickstart" class="py-24 border-t border-border">
-      <div class="max-w-6xl mx-auto px-5 sm:px-8">
-
-        <div class="text-center max-w-2xl mx-auto mb-16 reveal">
-          <div class="font-mono text-accent text-xs mb-3 key-prompt">QUICK START</div>
-          <h2 class="text-3xl font-bold tracking-tight text-white mb-4">Minimal, non-intrusive setup.</h2>
-          <p class="text-muted">Bootstrap local management immediately, then opt-in targets to accept managed configuration slices.</p>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-          <!-- Left Panel: Installation -->
-          <div class="reveal bg-surface border border-border rounded-[20px] flex flex-col justify-between group">
-            <div>
-              <div class="flex items-center justify-between px-5 py-4 bg-[#090c10] rounded-t-[20px] border-b border-border">
-                <div class="flex items-center gap-1.5">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
-                </div>
-                <span class="font-mono text-xs text-muted">1. Install & Initialize</span>
-                <!-- Copy Button -->
-                <button data-copy-target="install-code" class="text-xs font-mono text-muted hover:text-accent transition-colors duration-150 focus:outline-none px-2 py-0.5 rounded border border-transparent hover:border-border" aria-label="Copy installation script">
-                  Copy
-                </button>
-              </div>
-              <div class="p-6 font-mono text-sm overflow-x-auto text-text bg-bg leading-relaxed">
-                <pre id="install-code" class="text-left"><span class="text-muted"># Fetch the pure Bash script and execute locally</span>
-curl -fsSL https://raw.githubusercontent.com/Sofian-bll/sshk/main/install.sh | bash
-
-<span class="text-muted"># Create interactive setup</span>
-sshk create
-
-<span class="text-muted"># Verify environment status</span>
-sshk list</pre>
-              </div>
-            </div>
-            <div class="px-6 py-4 border-t border-border bg-[#0b0e12]/30 rounded-b-[20px] text-xs text-muted">
-              Installs the Bash script into your local bin directory. No daemon, database, or package manager required.
-            </div>
-          </div>
-
-          <!-- Right Panel: Remote Server Configuration -->
-          <div class="reveal bg-surface border border-border rounded-[20px] flex flex-col justify-between group">
-            <div>
-              <div class="flex items-center justify-between px-5 py-4 bg-[#090c10] rounded-t-[20px] border-b border-border">
-                <div class="flex items-center gap-1.5">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
-                </div>
-                <span class="font-mono text-xs text-muted">2. Target Server Integration</span>
-                <!-- Copy Button -->
-                <button data-copy-target="server-code" class="text-xs font-mono text-muted hover:text-accent transition-colors duration-150 focus:outline-none px-2 py-0.5 rounded border border-transparent hover:border-border" aria-label="Copy server configuration">
-                  Copy
-                </button>
-              </div>
-              <div class="p-6 font-mono text-sm overflow-x-auto text-text bg-bg leading-relaxed">
-                <pre id="server-code" class="text-left"><span class="text-muted"># Create directory structure on target host</span>
-mkdir -p ~/.ssh/authorized_keys.d
-chmod 700 ~/.ssh/authorized_keys.d
-
-<span class="text-muted"># Configure OpenSSH to read authorized key fragments</span>
-echo 'AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys.d/*' | sudo tee -a /etc/ssh/sshd_config
-
-<span class="text-muted"># Reload server configuration safely</span>
-sudo systemctl restart sshd</pre>
-              </div>
-            </div>
-            <div class="px-6 py-4 border-t border-border bg-[#0b0e12]/30 rounded-b-[20px] text-xs text-muted">
-              Lets OpenSSH read one authorized key file per trusted machine, so access can be granted and revoked cleanly.
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-    </section>
-  </main>
-
-  <!-- 8. FOOTER -->
-  <footer class="border-t border-border bg-bg py-12">
-    <div class="max-w-7xl mx-auto px-5 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs font-mono text-muted">
-
-      <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-center sm:text-left">
-        <span>sshk is open source under the <a href="https://github.com/Sofian-bll/sshk/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="text-text hover:text-accent underline transition-colors duration-150">MIT license</a>.</span>
-        <span class="hidden sm:inline text-border">|</span>
-        <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="text-text hover:text-accent underline transition-colors duration-150">GitHub Repository</a>
-      </div>
-
-      <div class="flex items-center gap-2 text-text">
-        <span>Pure Bash</span>
-        <span class="text-muted">+</span>
-        <span>OpenSSH</span>
-      </div>
-
+    <div class="terminal-body">
+      <span class="pr">~ $</span> <span class="cmd">sshk list</span><br/>
+      <span class="out">  github-personal    ed25519  2026-01-15  ~/.ssh/keys/github-personal</span><br/>
+      <span class="out">  gitlab-work        ed25519  2026-03-02  ~/.ssh/keys/gitlab-work</span><br/>
+      <span class="out">  homelab            ed25519  2026-04-10  ~/.ssh/keys/homelab</span><br/>
+      <span class="out">  vps-prod           rsa4096  2026-05-22  ~/.ssh/keys/vps-prod</span><br/><br/>
+      <span class="pr">~ $</span> <span class="cmd">sshk create</span><br/>
+      <span class="out">  Key name: github-new</span><br/>
+      <span class="out">  Key type [ed25519]: </span><br/>
+      <span class="out">  Email: sofian@example.com</span><br/>
+      <span class="out">  [+] Created identity: github-new (ed25519)</span><br/><br/>
+      <span class="pr">~ $</span> <span class="cmd">sshk grant github-personal</span><br/>
+      <span class="out">  [+] Key copied to clipboard for github-personal</span><br/><br/>
+      <span class="pr">~ $</span> <span class="cmd">sshk revoke github-personal</span><br/>
+      <span class="out">  [-] Removed from ~/.ssh/authorized_keys.d/</span><br/>
+      <span class="out">  [!] Run 'sshk copy github-personal' on remote host to re-grant</span>
     </div>
-  </footer>
+  </div>
+</div>
 
-  <!-- MICRO-INTERACTIONS -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // 1. Copy to Clipboard Button Logic
-      document.querySelectorAll('[data-copy-target]').forEach(button => {
-        button.addEventListener('click', async () => {
-          const targetId = button.getAttribute('data-copy-target');
-          const codeBlock = document.getElementById(targetId);
-          if (codeBlock) {
-            try {
-              // Extract text cleanly, ignoring comments if needed, but standard text matches target requirement
-              await navigator.clipboard.writeText(codeBlock.innerText.trim());
-              const originalText = button.innerHTML;
-              button.innerHTML = '<span class="text-accent">Copied</span>';
-              button.classList.add('border-accent-dim');
-              setTimeout(() => {
-                button.innerHTML = originalText;
-                button.classList.remove('border-accent-dim');
-              }, 1500);
-            } catch (err) {
-              console.error('Failed to copy text', err);
-            }
-          }
-        });
-      });
+<section class="container">
+  <h2>Install</h2>
+  <div class="install-line">
+    <span class="kw">curl</span> -fsSL <span class="url">https://raw.githubusercontent.com/Sofian-bll/sshk/main/install.sh</span> | <span class="kw">bash</span>
+  </div>
+</section>
 
-      // 2. Scroll Reveal Observer
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('active');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, {
-        threshold: 0.1
-      });
+<section class="container">
+  <h2>Commands</h2>
+  <div class="cmds">
+    <div class="cmd-card"><span class="cname">create</span><br/><span class="cdesc">New SSH key wizard</span></div>
+    <div class="cmd-card"><span class="cname">list</span><br/><span class="cdesc">List all identities</span></div>
+    <div class="cmd-card"><span class="cname">show &lt;name&gt;</span><br/><span class="cdesc">Public key + config</span></div>
+    <div class="cmd-card"><span class="cname">copy &lt;name&gt;</span><br/><span class="cdesc">Key to clipboard</span></div>
+    <div class="cmd-card"><span class="cname">grant &lt;name&gt;</span><br/><span class="cdesc">Authorize on remote</span></div>
+    <div class="cmd-card"><span class="cname">revoke &lt;name&gt;</span><br/><span class="cdesc">Remove access</span></div>
+    <div class="cmd-card"><span class="cname">delete &lt;name&gt;</span><br/><span class="cdesc">Delete identity</span></div>
+    <div class="cmd-card"><span class="cname">help</span><br/><span class="cdesc">Full reference</span></div>
+  </div>
+</section>
 
-      document.querySelectorAll('.reveal').forEach(element => {
-        observer.observe(element);
-      });
-    });
-  </script>
+<section class="container">
+  <h2>Structure</h2>
+  <div class="struct">
+    <span class="dir">~/.ssh/keys/</span>          &larr; Identities (one per key)<br/>
+    <span class="dir">~/.ssh/authorized_keys.d/</span>  &larr; Incoming access<br/>
+    <span class="dir">~/.ssh/config.d/</span>           &larr; Auto-assembled config
+  </div>
+</section>
+
+<footer>
+  <p>MIT &copy; 2026 Sofian &middot; <a href="https://github.com/Sofian-bll/sshk">GitHub</a></p>
+</footer>
+
 </body>
 </html>
