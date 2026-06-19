@@ -244,23 +244,29 @@
 
           <!-- Right: Terminal tree panel -->
           <div class="lg:col-span-7 reveal">
-            <div class="bg-[#0f1419] border border-border rounded-[20px] shadow-xl overflow-hidden">
-              <div class="flex items-center justify-between px-5 py-3.5 bg-[#090c10] border-b border-border/80">
-                <span class="font-mono text-xs text-muted">directory structure</span>
-                <span class="text-xs text-muted font-mono">tree ~/.ssh</span>
+            <div class="bg-surface border border-border rounded-[20px] shadow-xl overflow-hidden group hover:border-accent-dim transition-colors duration-300">
+              <div class="flex items-center justify-between px-5 py-4 bg-[#090c10] border-b border-border">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
+                </div>
+                <span class="font-mono text-xs text-muted">tree ~/.ssh</span>
+                <div class="w-12"></div>
               </div>
               <div class="p-6 font-mono text-xs sm:text-sm overflow-x-auto text-text bg-bg leading-relaxed">
-<span class="text-blue">~/.ssh/</span>
-├── <span class="text-blue">keys/</span>                  <span class="text-muted"># Managed local identities</span>
+                <pre class="text-left whitespace-pre min-w-max"><span class="text-blue">~/.ssh/</span>
+├── <span class="text-blue">keys/</span>                 <span class="text-muted"># identities</span>
 │   ├── <span class="text-blue">github/</span>
 │   │   └── id_ed25519
 │   └── <span class="text-blue">vela/</span>
 │       └── id_ed25519
-├── <span class="text-blue">config.d/</span>              <span class="text-muted"># Auto-sourced host declarations</span>
+├── <span class="text-blue">config.d/</span>             <span class="text-muted"># host config</span>
 │   ├── github.conf
 │   └── vela.conf
-└── <span class="text-blue">authorized_keys.d/</span>     <span class="text-muted"># Managed incoming client machine access</span>
-    └── macbook</div>
+└── <span class="text-blue">authorized_keys.d/</span>    <span class="text-muted"># incoming access</span>
+    └── macbook</pre>
+              </div>
             </div>
           </div>
 

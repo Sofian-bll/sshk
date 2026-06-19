@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="sshk logo" width="150" />
+![[docs/assets/logo.png|150]]
 
 # sshk
 
@@ -16,9 +16,7 @@
 
 `sshk` brings order to your SSH keys with a predictable directory structure — one identity per purpose, one command per action. Manage outgoing identities (keys you use to connect to other machines) and incoming access (keys that can connect to you) with the same tool. Zero dependencies beyond OpenSSH.
 
-<p align="center">
-  <img src="docs/screenshots/sshk-list.png" alt="sshk list command output" width="720" />
-</p>
+![[docs/screenshots/sshk-list.png|720]]
 
 ## Quick Start
 
