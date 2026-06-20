@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sshk</title>
 <meta name="description" content="SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.">
-<meta name="theme-color" content="#0a0908">
+<meta name="theme-color" content="#0d1117">
 <meta property="og:title" content="sshk">
 <meta property="og:description" content="SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.">
 <meta property="og:type" content="website">
@@ -27,9 +27,9 @@ tailwind.config = {
       border: 'var(--border)',
       text: 'var(--text)',
       muted: 'var(--muted)',
-      peach: '#ffb347',
-      pink: '#ff6b6b',
-      purple: '#6c5ce7'
+      peach: '#57a64a',
+      pink: '#3fb950',
+      purple: '#7ee787'
     }
   }}
 }
@@ -37,21 +37,21 @@ tailwind.config = {
 
 <style>
 :root {
-  --bg: #0a0908;
-  --surface: #131110;
-  --elevated: #1a1715;
-  --border: #2a2725;
-  --text: #f5f0eb;
-  --muted: rgba(245,240,235,0.58);
-  --peach: #ffb347;
-  --pink: #ff6b6b;
-  --purple: #6c5ce7;
-  --light-bg: #faf8f5;
-  --light-surface: #ffffff;
-  --light-elevated: #f0ede8;
-  --light-border: #e0dbd3;
-  --light-text: #1a1815;
-  --light-muted: rgba(26,24,21,0.55);
+  --bg: #0d1117;
+  --surface: #161b22;
+  --elevated: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: rgba(230,237,243,0.55);
+  --peach: #57a64a;
+  --pink: #3fb950;
+  --purple: #7ee787;
+  --light-bg: #ffffff;
+  --light-surface: #f6f8fa;
+  --light-elevated: #ebedf0;
+  --light-border: #d0d7de;
+  --light-text: #1f2328;
+  --light-muted: rgba(31,35,40,0.55);
 }
 
 .light {
@@ -71,7 +71,7 @@ tailwind.config = {
 }
 
 .light header {
-  background: #ffffffdd;
+  background: #f6f8fadd;
 }
 
 body {
@@ -123,10 +123,10 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
 .reveal.visible { opacity: 1; transform: none; }
 
 .radial-1 {
-  background: radial-gradient(ellipse 80% 60% at 20% 0%, rgba(255,179,71,0.08) 0%, transparent 60%);
+  background: radial-gradient(ellipse 80% 60% at 20% 0%, rgba(87,166,74,0.06) 0%, transparent 60%);
 }
 .radial-2 {
-  background: radial-gradient(ellipse 60% 50% at 85% 100%, rgba(255,107,107,0.05) 0%, transparent 60%);
+  background: radial-gradient(ellipse 60% 50% at 85% 100%, rgba(63,185,80,0.04) 0%, transparent 60%);
 }
 
 :focus-visible {
@@ -150,7 +150,7 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
 <div class="fixed inset-0 radial-2 pointer-events-none z-0"></div>
 
 <!-- @section nav -->
-<nav class="sticky top-0 z-50 bg-[#0a0908]/80 backdrop-blur-md border-b border-border py-2 px-6">
+<nav class="sticky top-0 z-50 bg-[#0d1117]/80 backdrop-blur-md border-b border-border py-2 px-6">
   <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
     <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 group shrink-0">
       <img src="assets/logo.png" alt="Logo" class="w-10 h-10 rounded-lg">
@@ -192,7 +192,7 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
         SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.
       </p>
       <div class="flex flex-col sm:flex-row gap-4 mb-16">
-        <a href="#quick-start" class="px-8 py-3 rounded-full font-bold text-sm text-[#0a0908] bg-gradient-to-br from-peach to-pink hover:opacity-90 transition-opacity">Get Started</a>
+        <a href="#quick-start" class="px-8 py-3 rounded-full font-bold text-sm text-[#0d1117] bg-gradient-to-br from-peach to-pink hover:opacity-90 transition-opacity">Get Started</a>
         <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="px-8 py-3 rounded-full font-bold text-sm text-text border border-border hover:border-peach/30 hover:bg-surface transition-colors">View on GitHub</a>
       </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-3xl mx-auto pt-12 reveal visible" style="transition-delay:.15s">
@@ -318,11 +318,11 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
           <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
           <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
           <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">1. Install</span>
-          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-0">
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="install">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
-        <pre id="code-panel-0" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+        <pre id="code-install" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"><code class="text-peach">curl -fsSL https://raw.githubusercontent.com/Sofian-bll/sshk/main/install.sh | bash</code></pre>
       </div>
       <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.1s">
         <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
@@ -330,11 +330,11 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
           <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
           <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
           <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">2. Create your first key</span>
-          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-1">
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="create">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
-        <pre id="code-panel-1" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+        <pre id="code-create" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"><code class="text-peach">sshk create</code></pre>
       </div>
       <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.2s">
         <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
@@ -342,11 +342,11 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
           <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
           <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
           <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">3. List your identities</span>
-          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-2">
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="list">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
-        <pre id="code-panel-2" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+        <pre id="code-list" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"><code class="text-peach">sshk list</code></pre>
       </div>
       <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.3s">
         <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
@@ -354,11 +354,11 @@ a:active, button:active { transform: scale(0.97); transition: transform 0.1s eas
           <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
           <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
           <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">4. Grant access to a server</span>
-          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-3">
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="grant">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
-        <pre id="code-panel-3" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+        <pre id="code-grant" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"><code class="text-peach">sshk grant mykey</code></pre>
       </div>
     </div>
   </div>
