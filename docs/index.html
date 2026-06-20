@@ -1,207 +1,507 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" class="scroll-smooth">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>sshk — SSH Key Manager</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sshk</title>
+<meta name="description" content="SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.">
+<meta name="theme-color" content="#0a0908">
+<meta property="og:title" content="sshk">
+<meta property="og:description" content="SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="sshk">
+<meta name="twitter:description" content="SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.">
+<meta name="twitter:image" content="assets/logo.png">
+<link rel="icon" type="image/png" href="assets/logo.png">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      bg: 'var(--bg)',
+      surface: 'var(--surface)',
+      elevated: 'var(--elevated)',
+      border: 'var(--border)',
+      text: 'var(--text)',
+      muted: 'var(--muted)',
+      peach: '#ffb347',
+      pink: '#ff6b6b',
+      purple: '#6c5ce7'
+    }
+  }}
+}
+</script>
+
 <style>
-  :root {
-    --bg: #1a1b26;
-    --surface: #24283b;
-    --text: #c0caf5;
-    --muted: #565f89;
-    --accent: #7aa2f7;
-    --green: #9ece6a;
-    --border: #36405a;
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-  }
-  a { color: var(--accent); text-decoration: none; }
-  .container { max-width: 740px; margin: 0 auto; padding: 0 24px; }
+:root {
+  --bg: #0a0908;
+  --surface: #131110;
+  --elevated: #1a1715;
+  --border: #2a2725;
+  --text: #f5f0eb;
+  --muted: rgba(245,240,235,0.58);
+  --peach: #ffb347;
+  --pink: #ff6b6b;
+  --purple: #6c5ce7;
+  --light-bg: #faf8f5;
+  --light-surface: #ffffff;
+  --light-elevated: #f0ede8;
+  --light-border: #e0dbd3;
+  --light-text: #1a1815;
+  --light-muted: rgba(26,24,21,0.55);
+}
 
-  header {
-    padding: 72px 0 48px;
-    text-align: center;
-  }
-  .header-logo { width: 96px; height: 96px; margin-bottom: 20px; }
-  h1 {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 2.6rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--accent);
-  }
-  .subtitle { font-size: 1rem; color: var(--muted); max-width: 420px; margin: 0 auto 20px; }
-  .badges {
-    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-  }
-  .badge {
-    font-size: 0.7rem; font-weight: 600; padding: 4px 10px;
-    border-radius: 16px; border: 1px solid var(--border); color: var(--muted);
-  }
-  .badge.hl { color: var(--accent); border-color: var(--accent); }
+.light {
+  --bg: var(--light-bg);
+  --surface: var(--light-surface);
+  --elevated: var(--light-elevated);
+  --border: var(--light-border);
+  --text: var(--light-text);
+  --muted: var(--light-muted);
+}
 
-  .terminal {
-    background: #1a1b26;
-    border: 2px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 48px;
-    box-shadow: 0 0 40px rgba(122,162,247,0.06);
-  }
-  .terminal-bar {
-    padding: 10px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .terminal-bar span { width: 11px; height: 11px; border-radius: 50%; background: #444; }
-  .terminal-bar span:nth-child(1) { background: #f7768e; }
-  .terminal-bar span:nth-child(2) { background: #e0af68; }
-  .terminal-bar span:nth-child(3) { background: #9ece6a; }
-  .terminal-bar .tname {
-    margin-left: 12px;
-    font-size: 0.7rem;
-    color: var(--muted);
-    font-family: monospace;
-  }
-  .terminal-body {
-    padding: 20px 22px;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.8rem;
-    line-height: 1.9;
-    overflow-x: auto;
-  }
-  .terminal-body .pr { color: var(--green); }
-  .terminal-body .cmd { color: var(--accent); }
-  .terminal-body .out { color: var(--muted); }
+.light .glass {
+  background: rgba(255,255,255,0.60);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.08);
+}
 
-  section { padding: 40px 0; }
-  section + section { border-top: 1px solid var(--border); }
-  h2 { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); }
+.light header {
+  background: #ffffffdd;
+}
 
-  .cmds {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px;
-  }
-  .cmd-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    font-family: monospace;
-  }
-  .cmd-card .cname { color: var(--accent); font-weight: 700; }
-  .cmd-card .cdesc { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
 
-  .install-line {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 18px;
-    font-family: monospace;
-    font-size: 0.82rem;
-    overflow-x: auto;
-  }
-  .install-line .kw { color: var(--green); }
-  .install-line .url { color: var(--accent); }
+.headline {
+  font-family: -apple-system, "SF Compact Display", "Helvetica Neue", sans-serif;
+  font-stretch: condensed;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
 
-  .struct {
-    font-family: monospace;
-    font-size: 0.83rem;
-    color: var(--muted);
-    line-height: 1.8;
-    padding-left: 12px;
-    border-left: 1px solid var(--border);
-  }
-  .struct .dir { color: var(--accent); }
+code, pre { font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
 
-  footer {
-    text-align: center; padding: 40px 0; font-size: 0.78rem;
-    color: var(--muted); border-top: 1px solid var(--border);
-  }
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.glass:hover { transform: translateY(-2px); border-color: var(--peach); }
+a:active, button:active { transform: scale(0.97); transition: transform 0.1s ease; }
+
+#back-to-top {
+  position: fixed; bottom: 24px; right: 24px; z-index: 50;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: translateY(16px); pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+#back-to-top.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#back-to-top:hover { color: var(--peach); border-color: var(--peach); }
+
+.pulse-dot { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.6); }
+}
+
+.reveal { opacity: 0; transform: translateY(20px); transition: all 0.6s ease-out; }
+.reveal.visible { opacity: 1; transform: none; }
+
+.radial-1 {
+  background: radial-gradient(ellipse 80% 60% at 20% 0%, rgba(255,179,71,0.08) 0%, transparent 60%);
+}
+.radial-2 {
+  background: radial-gradient(ellipse 60% 50% at 85% 100%, rgba(255,107,107,0.05) 0%, transparent 60%);
+}
+
+:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .pulse-dot, #back-to-top { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
+  .glass:hover { transform: none !important; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 </style>
 </head>
-<body>
+<body class="min-h-dvh flex flex-col antialiased relative overflow-x-hidden">
 
-<header class="container">
-  <img src="../assets/logo.svg" alt="sshk" class="header-logo"/>
-  <h1>sshk</h1>
-  <p class="subtitle">SSH Key Manager. Pure Bash. Zero deps. One identity per purpose, one command per action.</p>
-  <div class="badges">
-    <span class="badge hl">MIT</span>
-    <span class="badge">Bash</span>
-    <span class="badge">OpenSSH</span>
-  </div>
-</header>
+<div class="fixed inset-0 radial-1 pointer-events-none z-0"></div>
+<div class="fixed inset-0 radial-2 pointer-events-none z-0"></div>
 
-<div class="container">
-  <div class="terminal">
-    <div class="terminal-bar">
-      <span></span><span></span><span></span>
-      <span class="tname">sshk</span>
-    </div>
-    <div class="terminal-body">
-      <span class="pr">~ $</span> <span class="cmd">sshk list</span><br/>
-      <span class="out">  github-personal    ed25519  2026-01-15  ~/.ssh/keys/github-personal</span><br/>
-      <span class="out">  gitlab-work        ed25519  2026-03-02  ~/.ssh/keys/gitlab-work</span><br/>
-      <span class="out">  homelab            ed25519  2026-04-10  ~/.ssh/keys/homelab</span><br/>
-      <span class="out">  vps-prod           rsa4096  2026-05-22  ~/.ssh/keys/vps-prod</span><br/><br/>
-      <span class="pr">~ $</span> <span class="cmd">sshk create</span><br/>
-      <span class="out">  Key name: github-new</span><br/>
-      <span class="out">  Key type [ed25519]: </span><br/>
-      <span class="out">  Email: sofian@example.com</span><br/>
-      <span class="out">  [+] Created identity: github-new (ed25519)</span><br/><br/>
-      <span class="pr">~ $</span> <span class="cmd">sshk grant github-personal</span><br/>
-      <span class="out">  [+] Key copied to clipboard for github-personal</span><br/><br/>
-      <span class="pr">~ $</span> <span class="cmd">sshk revoke github-personal</span><br/>
-      <span class="out">  [-] Removed from ~/.ssh/authorized_keys.d/</span><br/>
-      <span class="out">  [!] Run 'sshk copy github-personal' on remote host to re-grant</span>
+<!-- @section nav -->
+<nav class="sticky top-0 z-50 bg-[#0a0908]/80 backdrop-blur-md border-b border-border py-2 px-6">
+  <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
+    <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 group shrink-0">
+      <img src="assets/logo.png" alt="Logo" class="w-10 h-10 rounded-lg">
+      <span class="font-semibold text-[15px] whitespace-nowrap text-text group-hover:text-peach transition-colors">sshk</span>
+    </a>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-xs font-medium text-muted hover:text-text transition-colors px-3 py-1.5 rounded-full border border-border hover:border-peach/30">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <span class="flex items-center gap-1.5 text-xs font-mono text-peach border border-peach/30 px-3 py-1.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-peach pulse-dot"></span>v1.0.0</span>
+      <button id="theme-toggle" class="p-2 rounded-full hover:bg-surface transition-colors text-muted hover:text-text" aria-label="Toggle theme">
+        <svg id="sun-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="moon-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
     </div>
   </div>
-</div>
+</nav>
+<!-- /@section nav -->
 
-<section class="container">
-  <h2>Install</h2>
-  <div class="install-line">
-    <span class="kw">curl</span> -fsSL <span class="url">https://raw.githubusercontent.com/Sofian-bll/sshk/main/install.sh</span> | <span class="kw">bash</span>
+<main class="flex-1">
+
+<!-- ============================================================ -->
+<!-- HERO — centered (default: CLI / lib / docs, no screenshot)   -->
+<!-- ============================================================ -->
+
+<!-- @section hero-centered -->
+<section class="relative pt-20 pb-16">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center flex flex-col items-center reveal">
+      <div class="flex items-center gap-2 text-muted uppercase tracking-[0.2em] text-[10px] font-bold mb-6">
+        <span class="w-1.5 h-1.5 bg-peach rounded-full pulse-dot"></span>
+        Open Source CLI
+      </div>
+      <h1 class="headline text-5xl md:text-7xl font-bold leading-[0.95] mb-6 max-w-4xl">
+        sshk
+      </h1>
+      <p class="text-muted text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
+        SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 mb-16">
+        <a href="#quick-start" class="px-8 py-3 rounded-full font-bold text-sm text-[#0a0908] bg-gradient-to-br from-peach to-pink hover:opacity-90 transition-opacity">Get Started</a>
+        <a href="https://github.com/Sofian-bll/sshk" target="_blank" rel="noopener noreferrer" class="px-8 py-3 rounded-full font-bold text-sm text-text border border-border hover:border-peach/30 hover:bg-surface transition-colors">View on GitHub</a>
+      </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-3xl mx-auto pt-12 reveal visible" style="transition-delay:.15s">
+<div class="glass rounded-xl p-4 flex items-center gap-3 text-left">
+          <div class="w-9 h-9 rounded-lg bg-peach/10 text-peach flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm"><span class="font-bold text-lg text-peach leading-tight">Bash</span> <span class="font-semibold text-text">Zero Dependencies</span></div>
+            <div class="text-[11px] text-muted mt-0.5 leading-tight"></div>
+          </div>
+        </div>
+<div class="glass rounded-xl p-4 flex items-center gap-3 text-left">
+          <div class="w-9 h-9 rounded-lg bg-peach/10 text-peach flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm"><span class="font-bold text-lg text-peach leading-tight">8</span> <span class="font-semibold text-text">Commands</span></div>
+            <div class="text-[11px] text-muted mt-0.5 leading-tight"></div>
+          </div>
+        </div>
+<div class="glass rounded-xl p-4 flex items-center gap-3 text-left">
+          <div class="w-9 h-9 rounded-lg bg-peach/10 text-peach flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm"><span class="font-bold text-lg text-peach leading-tight">MIT</span> <span class="font-semibold text-text">License</span></div>
+            <div class="text-[11px] text-muted mt-0.5 leading-tight"></div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
   </div>
 </section>
+<!-- /@section hero-centered -->
 
-<section class="container">
-  <h2>Commands</h2>
-  <div class="cmds">
-    <div class="cmd-card"><span class="cname">create</span><br/><span class="cdesc">New SSH key wizard</span></div>
-    <div class="cmd-card"><span class="cname">list</span><br/><span class="cdesc">List all identities</span></div>
-    <div class="cmd-card"><span class="cname">show &lt;name&gt;</span><br/><span class="cdesc">Public key + config</span></div>
-    <div class="cmd-card"><span class="cname">copy &lt;name&gt;</span><br/><span class="cdesc">Key to clipboard</span></div>
-    <div class="cmd-card"><span class="cname">grant &lt;name&gt;</span><br/><span class="cdesc">Authorize on remote</span></div>
-    <div class="cmd-card"><span class="cname">revoke &lt;name&gt;</span><br/><span class="cdesc">Remove access</span></div>
-    <div class="cmd-card"><span class="cname">delete &lt;name&gt;</span><br/><span class="cdesc">Delete identity</span></div>
-    <div class="cmd-card"><span class="cname">help</span><br/><span class="cdesc">Full reference</span></div>
+<!-- ============================================================ -->
+<!-- HERO — with screenshot (web apps)                             -->
+<!-- ============================================================ -->
+
+
+<!-- ============================================================ -->
+<!-- STORY — glass cards with connector dots                       -->
+<!-- ============================================================ -->
+
+
+
+<!-- ============================================================ -->
+<!-- FEATURES — glass cards with colored icon containers           -->
+<!-- ============================================================ -->
+
+<!-- @section features -->
+<section class="py-20">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+      <h2 class="headline text-3xl md:text-4xl font-bold mb-4">Features</h2>
+      
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.0s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">One Identity Per Purpose</h3>
+        <p class="text-muted text-sm leading-relaxed">Each SSH key lives in its own namespace under ~/.ssh/keys/ — no more flat id_rsa mess.</p>
+      </div>
+      <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.1s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">Interactive Creation Wizard</h3>
+        <p class="text-muted text-sm leading-relaxed">Create ed25519 or RSA keys with guided prompts for name, host, and comment.</p>
+      </div>
+      <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.2s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">Grant & Revoke</h3>
+        <p class="text-muted text-sm leading-relaxed">Push your public key to remote servers in a single command. Revoke access just as easily.</p>
+      </div>
+      <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.3s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">Auto-Assembled SSH Config</h3>
+        <p class="text-muted text-sm leading-relaxed">Config snippets under ~/.ssh/config.d/ are assembled automatically so ssh <name> just works.</p>
+      </div>
+      <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.4s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">Zero Dependencies</h3>
+        <p class="text-muted text-sm leading-relaxed">Pure Bash. Nothing to install beyond OpenSSH, which you already have.</p>
+      </div>
+      <div class="reveal visible glass rounded-2xl p-8 flex flex-col gap-4" style="transition-delay:0.5s">
+        <div class="w-10 h-10 rounded-xl bg-peach/10 text-peach flex items-center justify-center">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <h3 class="font-bold text-lg">Authorized Keys Management</h3>
+        <p class="text-muted text-sm leading-relaxed">Track who can connect to your machine with ~/.ssh/authorized_keys.d/ — one file per source.</p>
+      </div>
+    </div>
   </div>
 </section>
+<!-- /@section features -->
 
-<section class="container">
-  <h2>Structure</h2>
-  <div class="struct">
-    <span class="dir">~/.ssh/keys/</span>          &larr; Identities (one per key)<br/>
-    <span class="dir">~/.ssh/authorized_keys.d/</span>  &larr; Incoming access<br/>
-    <span class="dir">~/.ssh/config.d/</span>           &larr; Auto-assembled config
+<!-- ============================================================ -->
+<!-- QUICK START — CLI tool (macOS terminal panels)               -->
+<!-- ============================================================ -->
+
+<!-- @section quick-cli -->
+<section id="quick-start" class="py-20">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+      <h2 class="headline text-3xl md:text-4xl font-bold mb-4">Quick Start</h2>
+      <p class="text-muted">Install in one command. Start managing SSH keys.</p>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.0s">
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+          <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">1. Install</span>
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+        <pre id="code-panel-0" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+      </div>
+      <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.1s">
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+          <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">2. Create your first key</span>
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-1">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+        <pre id="code-panel-1" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+      </div>
+      <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.2s">
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+          <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">3. List your identities</span>
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+        <pre id="code-panel-2" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+      </div>
+      <div class="reveal visible glass rounded-2xl overflow-hidden flex flex-col group" style="transition-delay:0.3s">
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-white/5 rounded-t-2xl">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+          <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">4. Grant access to a server</span>
+          <button class="ml-auto text-muted hover:text-peach transition-colors p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Copy" data-copy="panel-3">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+        <pre id="code-panel-3" class="p-6 text-sm text-text leading-relaxed whitespace-pre-wrap overflow-x-hidden"></pre>
+      </div>
+    </div>
   </div>
 </section>
+<!-- /@section quick-cli -->
 
-<footer>
-  <p>MIT &copy; 2026 Sofian &middot; <a href="https://github.com/Sofian-bll/sshk">GitHub</a></p>
+<!-- ============================================================ -->
+<!-- QUICK START — web app (setup + .env panels)                  -->
+<!-- ============================================================ -->
+
+
+<!-- ============================================================ -->
+<!-- DEMO — screenshot or video embed                              -->
+<!-- ============================================================ -->
+
+
+<!-- ============================================================ -->
+<!-- FAQ — details/summary elements                                -->
+<!-- ============================================================ -->
+
+
+<!-- ============================================================ -->
+<!-- ARCHITECTURE — stacked cards with CSS connectors              -->
+<!-- ============================================================ -->
+
+<!-- @section architecture -->
+<section class="py-20">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+      <h2 class="headline text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
+      <p class="text-muted">Three directories. One predictable structure.</p>
+    </div>
+    <div class="reveal max-w-2xl mx-auto" style="transition-delay:.1s">
+      <div class="glass rounded-[20px] overflow-hidden">
+        <div class="flex items-center gap-1.5 px-4 py-3 bg-surface border-b border-border rounded-t-[20px]">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+          <span class="text-[10px] text-muted ml-2 font-mono uppercase tracking-wider">tree sshk</span>
+        </div>
+        <pre class="p-6 font-mono text-xs sm:text-sm text-left leading-relaxed whitespace-pre-wrap overflow-x-hidden">~/.ssh/
+├── keys/                  # Your identities
+│   ├── github/
+│   │   └── id_ed25519
+│   └── vela/
+│       └── id_ed25519
+├── config.d/              # SSH config snippets
+│   ├── github.conf
+│   └── vela.conf
+└── authorized_keys.d/     # Who can connect to you
+    └── macbook</pre>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- /@section architecture -->
+
+</main>
+
+<!-- ============================================================ -->
+<!-- FOOTER — clean, minimal                                       -->
+<!-- ============================================================ -->
+
+<!-- @section footer -->
+<footer class="py-8 px-6">
+  <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted">
+    <div>MIT License &copy; 2026 Sofian</div>
+    <div class="flex items-center gap-2">
+      <span class="text-[10px] font-mono border border-border px-3 py-1 rounded-full">Bash</span>
+        <span class="text-[10px] font-mono border border-border px-3 py-1 rounded-full">OpenSSH</span>
+    </div>
+  </div>
 </footer>
+<!-- /@section footer -->
+
+<!-- ============================================================ -->
+<!-- SCRIPTS (fixed, never change)                                -->
+<!-- ============================================================ -->
+
+<script>
+// Theme toggle
+(function() {
+  var toggle = document.getElementById('theme-toggle');
+  var sun = document.getElementById('sun-icon');
+  var moon = document.getElementById('moon-icon');
+  var html = document.documentElement;
+
+  function setTheme(l) {
+    if (l) { html.classList.add('light'); sun.classList.remove('hidden'); moon.classList.add('hidden'); }
+    else   { html.classList.remove('light'); sun.classList.add('hidden'); moon.classList.remove('hidden'); }
+  }
+
+  var s = localStorage.getItem('theme');
+  setTheme(s === 'light');
+
+  toggle.addEventListener('click', function() {
+    var isLight = !html.classList.contains('light');
+    setTheme(isLight);
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+})();
+
+// Scroll reveal
+(function() {
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(function(el) { obs.observe(el); });
+})();
+</script>
+
+<script>
+// Copy to clipboard
+document.querySelectorAll('[data-copy]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var id = this.getAttribute('data-copy');
+    var el = document.getElementById('code-' + id);
+    var txt = el.textContent.trim();
+    navigator.clipboard.writeText(txt).then(function() {
+      var origHTML = btn.innerHTML;
+      btn.innerHTML = '<span class="text-peach text-[10px] font-bold uppercase tracking-wider">Copied!</span>';
+      setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+    }).catch(function() {});
+  });
+});
+</script>
+
+
+
+<script>
+// Back to top
+(function() {
+  var btt = document.getElementById('back-to-top');
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 500) btt.classList.add('visible');
+    else btt.classList.remove('visible');
+  }, {passive: true});
+})();
+</script>
+
+<button id="back-to-top" aria-label="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+</button>
 
 </body>
 </html>

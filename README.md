@@ -1,16 +1,19 @@
-> [Lire en Francais](README.md) | [Read in English](README.en.md)
-
 <div align="center">
 
-<img src="docs/assets/logo.png" width="150" alt="sshk logo"/>
+[![License: MIT](https://img.shields.io/github/license/Sofian-bll/sshk?style=flat)](https://github.com/Sofian-bll/sshk/blob/main/LICENSE)
+[![Version](https://img.shields.io/github/v/release/Sofian-bll/sshk?style=flat)](https://github.com/Sofian-bll/sshk/releases)
+[![Stars](https://img.shields.io/github/stars/Sofian-bll/sshk?style=flat)](https://github.com/Sofian-bll/sshk/stargazers)
 
-# sshk
+<p align="center">
+  <img src="docs/assets/logo.png" width="160" alt="sshk logo"/>
+</p>
 
-**SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.**
+<a id="readme-top"></a>
+<h1 align="center">sshk</h1>
 
-[![License: MIT](https://img.shields.io/github/license/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/blob/main/LICENSE)
-[![Release](https://img.shields.io/github/v/release/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/releases)
-[![Stars](https://img.shields.io/github/stars/Sofian-bll/sshk?style=for-the-badge)](https://github.com/Sofian-bll/sshk/stargazers)
+<p align="center">SSH Key Manager — create, organize, grant, and revoke SSH keys. Pure Bash + OpenSSH.</p>
+
+<p align="center">🇬🇧 <a href="README.md"><b>English</b></a> · 🇫🇷 <a href="README.fr.md">Français</a></p>
 
 </div>
 
@@ -40,42 +43,42 @@ sshk grant NAME  # Push a key to a remote server
 ```
 $ sshk
 
-  🔑  sshk — Gestionnaire de clés SSH
+  🔑  sshk — SSH Key Manager
 
-  Usage : sshk <commande> [options]
+  Usage: sshk <command> [options]
 
-  Identités (sortant)
+  Outgoing Identities
   ──────────────────────────────────────────────────
-  create          Assistant interactif de création
-  list            Lister tout (identités + accès)
-  list --keys     Seulement mes identités
-  list --auth     Seulement les accès entrants
-  show <nom>      Détails d'une identité
-  copy <nom>      Copier la clé publique
-  delete <nom>    Supprimer une identité
+  create          Interactive creation wizard
+  list            List everything (identities + access)
+  list --keys     My identities only
+  list --auth     Incoming access only
+  show <name>     Identity details
+  copy <name>     Copy public key
+  delete <name>   Delete an identity
 
-  Accès (entrant)
+  Incoming Access
   ──────────────────────────────────────────────────
-  grant <nom>     Autoriser une machine distante
-  revoke <nom>    Révoquer l'accès
+  grant <name>    Authorize a remote machine
+  revoke <name>   Revoke access
 ```
 
 ### Create a key
 
 ```
 $ sshk create
-Nom de la nouvelle identité : github
-Type de clé (1=ed25519 recommandé, 2=rsa 4096) [1] :
-Commentaire [sofian@github] :
-Nom d'hôte (HostName) [github.com] :
+New identity name: github
+Key type (1=ed25519 recommended, 2=rsa 4096) [1]:
+Comment [sofian@github]:
+HostName [github.com]:
 
-  📋 Résumé
-  Nom       : github
+  📋 Summary
+  Name      : github
   Type      : ed25519
   HostName  : github.com
 
-Créer cette identité ? [O/n]
-✅ Identité créée.
+Create this identity? [Y/n]
+✅ Identity created.
 ```
 
 ### List all keys
@@ -83,7 +86,7 @@ Créer cette identité ? [O/n]
 ```
 $ sshk list
 
-  NOM      TYPE      EMPREINTE              CRÉÉ
+  NAME     TYPE      FINGERPRINT           CREATED
   ──────────────────────────────────────────────────
   github   ed25519   SHA256:nsUE...          03/03
   vela     ed25519   SHA256:s7N3...          01/06
@@ -97,23 +100,23 @@ $ sshk show vela
 
   🔑  vela
   Type       : ed25519
-  Empreinte  : SHA256:s7N3Um...
+  Fingerprint: SHA256:s7N3Um...
   Comment    : sofian@vela
-  Créée le   : 2026-06-01
-  Chemin     : ~/.ssh/keys/vela/id_ed25519
+  Created    : 2026-06-01
+  Path       : ~/.ssh/keys/vela/id_ed25519
   Config     : ~/.ssh/config.d/vela.conf
     HostName : 100.77.184.28
 
   ssh         : ssh vela
-  copier      : sshk copy vela
+  copy        : sshk copy vela
 ```
 
 ### Grant access to a server
 
 ```
 $ sshk grant void
-ℹ  Copie de la clé publique vers void (100.115.31.73)...
-✅ Accès accordé → macbook autorisé sur void.
+ℹ  Copying public key to void (100.115.31.73)...
+✅ Access granted → macbook authorized on void.
 ```
 
 ## How it works
@@ -177,14 +180,6 @@ sshk/
 | [`docs/index.html`](docs/index.html) | GitHub Pages landing page |
 | `sshk` | Main script — all commands, key helpers, clipboard support |
 | `install.sh` | One-line installer for `~/.local/bin` |
-
-## Contributing
-
-PRs and issues welcome. Found a bug or have an idea? [Open an issue](https://github.com/Sofian-bll/sshk/issues).
-
-<a href="https://github.com/Sofian-bll/sshk/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Sofian-bll/sshk" />
-</a>
 
 ## License
 
